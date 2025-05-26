@@ -27,6 +27,9 @@ jobs:
 
       - name: Run update script
         run: |
+          pwd
+          ls -l
+          ls -l scripts/
           python scripts/update_data.py
 
       - name: Commit and push changes

@@ -1,5 +1,6 @@
 # dashboard.py
 # dashboard.py — 청크 1: 라이브러리 임포트 및 앱 초기화 + 단일 app.layout
+import os
 import dash
 from dash import dcc, html, Input, Output
 import dash_bootstrap_components as dbc
@@ -46,8 +47,8 @@ app.layout = html.Div(style={'display':'flex','height':'100vh'}, children=[
 
 
 # 청크 2: 데이터 로딩 및 전처리
-fred = Fred(api_key="fb40b5238c2c5ff6b281706029681f15")  # 예시: 실제 키로 교체
-BEA_API_KEY = "1A43CED6-707A-4E61-B475-A31AAB37AD01" 
+fred = Fred(api_key=os.environ.get("FRED_API_KEY"))  # 예시: 실제 키로 교체
+BEA_API_KEY = os.environ.get("BEA_API_KEY", "") 
 BEA_BASE_URL = "https://apps.bea.gov/api/data"
 # Q_MAP 정의 (분기말 날짜 매핑)
 Q_MAP = {'Q1':'-03-31','Q2':'-06-30','Q3':'-09-30','Q4':'-12-31'}

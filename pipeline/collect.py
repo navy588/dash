@@ -275,9 +275,11 @@ def main(argv=None):
     defs = {i["id"]: i for i in registry["indicators"]}
     for item in latest["indicators"]:
         if "last" in item:
-            c = item["changes"]["prev"]
-            print(f"  {defs[item['id']]['name']:<14} {item['last']['date']}  {item['last']['value']:>14,.4f}"
-                  f"  {'' if c is None else f'{c["value"]:+.2f}'} {defs[item['id']]['change']}  σ={item['sigma']}  {item['status']}")
+            d = defs[item["id"]]
+            ch = item["changes"]["prev"]
+            delta = "" if ch is None else format(ch["value"], "+.2f")
+            print(f"  {d['name']:<14} {item['last']['date']}  {item['last']['value']:>14,.4f}"
+                  f"  {delta} {d['change']}  σ={item['sigma']}  {item['status']}")
     for item in latest["indicators"]:
         if item["status"] != "ok":
             print(f"{'::warning::' if gha else '경고: '}{item['id']} {item['status']}: {item.get('error')}")

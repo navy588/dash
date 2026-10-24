@@ -13,6 +13,7 @@ sync_api = pytest.importorskip("playwright.sync_api")
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "pipeline"))
+import briefing  # noqa: E402
 import collect  # noqa: E402
 from fakes import fake_fred, fake_yahoo  # noqa: E402
 
@@ -28,6 +29,7 @@ def site_url(tmp_path_factory):
         reg = collect.load_registry()
         latest, series = collect.collect(reg, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, log=lambda *_: None)
         collect.write_output(www / "data", reg, latest, series)
+        briefing.write(www / "data")
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(www))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -57,6 +59,8 @@ def test_dashboard_renders(browser, site_url, viewport, scheme):
     assert page.locator(".grid .tile").count() == expected
     assert "갱신" in page.locator("#updated").inner_text()
     assert page.locator("#curve-chart svg path").count() >= 3
+    page.wait_for_selector("#briefing-block:not([hidden]) .briefing-list li")
+    assert page.locator("#briefing-headline").inner_text()
     # 가로 스크롤이 생기지 않아야 함
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
 

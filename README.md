@@ -7,6 +7,7 @@
 
 ## 화면
 
+- **오늘의 브리핑:** 큰 움직임과 분야별 대표 지표를 한국어 문장으로 요약합니다. `data/briefing.md`(마크다운)로도 받을 수 있습니다.
 - **오늘의 큰 움직임:** 직전 대비 변화가 최근 1년 평균 변동폭(표준편차)의 2배를 넘은 지표만 모아 보여 줍니다.
 - **분야별 카드:** 한국, 미국 주식, 글로벌 주식, 환율, 금리, 원자재·코인, 미국 거시지표. 직전·1주·1개월·연초·1년 대비 변화를 고를 수 있습니다.
   상승은 빨강 ▲, 하락은 파랑 ▼이고, 카드마다 기준일을 표시합니다.
@@ -18,6 +19,7 @@
 ```
 pipeline/indicators.json   지표 정의 (이름·그룹·출처·코드·단위·변화 표시 방식) — 지표 추가/삭제는 여기만 고치면 됩니다
 pipeline/collect.py        수집 → site/data/*.json 생성
+pipeline/briefing.py       latest.json → 한국어 일일 브리핑 (data/briefing.json, briefing.md)
 pipeline/health.py         연속 실패 지표 판별 (알림용)
 pipeline/tests/            단위 테스트, 가짜 데이터로 화면을 띄우는 브라우저 테스트
 site/                      정적 페이지 (HTML·CSS·JS, 외부 라이브러리 없음)
@@ -41,6 +43,7 @@ PR에서는 테스트와 실제 수집까지만 하고 배포하지 않습니다
 - `data/latest.json`: `generated_at`, `counts`(ok/stale/missing), `indicators[]`(`id`, `status`, `last`, `changes.{prev,w1,m1,ytd,y1}`, `sigma`, `spark`), `curve[]`
 - `data/series/<id>.json`: `{ "id", "dates": [...], "values": [...] }`
 - `data/indicators.json`: 지표 정의 사본
+- `data/briefing.json`: `as_of`, `headline`, `highlights[]`(`id`, `text`), `sections[]`(`group`, `name`, `text`), `stale[]` / `data/briefing.md`: 같은 마크다운
 
 ## 처음 한 번만 할 일
 

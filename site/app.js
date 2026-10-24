@@ -145,6 +145,27 @@ function renderMovers() {
   for (const it of movers) box.appendChild(tile(state.defs.get(it.id), it, { showSigma: true }));
 }
 
+// 브리핑은 없어도 화면이 동작하도록 실패를 무시합니다 (pipeline/briefing.py 가 생성)
+async function renderBriefing() {
+  let brief;
+  try {
+    const r = await fetch(`${DATA}/briefing.json`, { cache: 'no-cache' });
+    if (!r.ok) return;
+    brief = await r.json();
+  } catch { return; }
+  document.getElementById('briefing-headline').textContent = brief.headline;
+  const list = document.getElementById('briefing-list');
+  list.replaceChildren();
+  for (const s of brief.sections) {
+    const li = document.createElement('li');
+    const b = document.createElement('b');
+    b.textContent = s.name;
+    li.append(b, ' ', s.text);
+    list.appendChild(li);
+  }
+  document.getElementById('briefing-block').hidden = false;
+}
+
 function renderGroups() {
   const root = document.getElementById('groups');
   root.replaceChildren();
@@ -314,6 +335,7 @@ async function main() {
   if (stale || missing) msgs.push(`${stale + missing}개 지표는 이번에 새로 받지 못해 이전 데이터로 표시합니다.`);
   if (msgs.length) { notice.textContent = msgs.join(' '); notice.hidden = false; }
 
+  renderBriefing();
   renderMovers();
   renderGroups();
   latestCurve = latest.curve;

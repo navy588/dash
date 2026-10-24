@@ -141,11 +141,12 @@ def build_notes(registry, data_dir, previous_url=None, search=google_news,
 
     for ind_id, (ind, evs) in notes.items():
         stats["events"] += len(evs)
+        stats["with_headlines"] = stats.get("with_headlines", 0) + sum(bool(e["headlines"]) for e in evs)
         with open(out_dir / f"{ind_id}.json", "w", encoding="utf-8") as f:
             json.dump({"id": ind_id, "query": ind.get("news", ind["name"]), "events": evs},
                       f, ensure_ascii=False, separators=(",", ":"))
     log(f"뉴스: 시점 {stats['events']}개 · 새로 검색 {stats['searched']} · 재사용 {stats['cached']} · "
-        f"실패 {stats['failed']} · 다음 실행으로 미룸 {stats['pending']}")
+        f"실패 {stats['failed']} · 다음 실행으로 미룸 {stats['pending']} · 헤드라인 있는 시점 {stats.get('with_headlines', 0)}")
     return stats
 
 

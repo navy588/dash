@@ -60,6 +60,14 @@ jobs:
           python pipeline/collect.py --out site/data
           python pipeline/health.py "$PREVIOUS_DATA_URL" >> "$GITHUB_OUTPUT"
 
+      - name: Render check with collected data (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          pip install -r pipeline/requirements-dev.txt
+          python -m playwright install --with-deps chromium
+          cp -r site/data "$RUNNER_TEMP/data"
+          SITE_DATA_DIR="$RUNNER_TEMP/data" python -m pytest -q pipeline/tests/test_site.py
+
       - name: Upload preview (PR)
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4

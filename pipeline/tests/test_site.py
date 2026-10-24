@@ -21,9 +21,13 @@ from fakes import fake_fred, fake_yahoo  # noqa: E402
 def site_url(tmp_path_factory):
     www = tmp_path_factory.mktemp("www")
     shutil.copytree(ROOT / "site", www, dirs_exist_ok=True)
-    reg = collect.load_registry()
-    latest, series = collect.collect(reg, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, log=lambda *_: None)
-    collect.write_output(www / "data", reg, latest, series)
+    real = os.environ.get("SITE_DATA_DIR")  # 실제 수집 결과로 확인할 때
+    if real:
+        shutil.copytree(real, www / "data", dirs_exist_ok=True)
+    else:
+        reg = collect.load_registry()
+        latest, series = collect.collect(reg, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, log=lambda *_: None)
+        collect.write_output(www / "data", reg, latest, series)
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(www))
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -49,8 +53,8 @@ def test_dashboard_renders(browser, site_url, viewport, scheme):
     page.goto(site_url)
     page.wait_for_selector(".grid .tile")
 
-    reg = collect.load_registry()
-    assert page.locator(".grid .tile").count() == len(reg["indicators"])
+    expected = page.evaluate("fetch('data/latest.json').then(r => r.json()).then(d => d.indicators.filter(i => i.last).length)")
+    assert page.locator(".grid .tile").count() == expected
     assert "갱신" in page.locator("#updated").inner_text()
     assert page.locator("#curve-chart svg path").count() >= 3
     # 가로 스크롤이 생기지 않아야 함

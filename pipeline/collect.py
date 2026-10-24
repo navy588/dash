@@ -137,7 +137,7 @@ def summarize(s, ind):
     last_date, last = s.index[-1], float(s.iloc[-1])
     refs = {
         "prev": (s.index[-2], float(s.iloc[-2])) if len(s) > 1 else (None, None),
-        "w1": value_at(s, last_date - pd.Timedelta(days=7)),
+        "w1": value_at(s, last_date - pd.DateOffset(weeks=1)),
         "m1": value_at(s, last_date - pd.DateOffset(months=1)),
         "ytd": value_at(s, pd.Timestamp(year=last_date.year - 1, month=12, day=31)),
         "y1": value_at(s, last_date - pd.DateOffset(years=1)),
@@ -272,6 +272,12 @@ def main(argv=None):
     total = len(registry["indicators"])
     print(f"정상 {c['ok']} · 이전 값 유지 {c['stale']} · 없음 {c['missing']} (전체 {total})")
     gha = bool(os.environ.get("GITHUB_ACTIONS"))
+    defs = {i["id"]: i for i in registry["indicators"]}
+    for item in latest["indicators"]:
+        if "last" in item:
+            c = item["changes"]["prev"]
+            print(f"  {defs[item['id']]['name']:<14} {item['last']['date']}  {item['last']['value']:>14,.4f}"
+                  f"  {'' if c is None else f'{c["value"]:+.2f}'} {defs[item['id']]['change']}  σ={item['sigma']}  {item['status']}")
     for item in latest["indicators"]:
         if item["status"] != "ok":
             print(f"{'::warning::' if gha else '경고: '}{item['id']} {item['status']}: {item.get('error')}")

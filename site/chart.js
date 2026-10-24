@@ -8,7 +8,7 @@ function el(name, attrs = {}, parent) {
   return node;
 }
 
-export function sparkline(values, { width = 84, height = 36 } = {}) {
+export function sparkline(values, { width = 84, height = 36, color = 'var(--spark)' } = {}) {
   const svg = el('svg', { viewBox: `0 0 ${width} ${height}`, class: 'spark', 'aria-hidden': 'true', preserveAspectRatio: 'none' });
   if (!values || values.length < 2) return svg;
   const min = Math.min(...values), max = Math.max(...values);
@@ -20,11 +20,11 @@ export function sparkline(values, { width = 84, height = 36 } = {}) {
   ]);
   el('polyline', {
     points: pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' '),
-    fill: 'none', stroke: 'var(--spark)', 'stroke-width': 1.5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+    fill: 'none', stroke: color, 'stroke-width': 1.5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
     'vector-effect': 'non-scaling-stroke',
   }, svg);
   const [lx, ly] = pts[pts.length - 1];
-  el('circle', { cx: lx, cy: ly, r: 2.5, fill: 'var(--spark)' }, svg);
+  el('circle', { cx: lx, cy: ly, r: 2.5, fill: color }, svg);
   return svg;
 }
 
@@ -43,9 +43,11 @@ function niceTicks(min, max, count = 5) {
 /**
  * series: [{ name, color, values: number[] }] — 모두 같은 길이, x 위치는 xs 공유
  * xs: number[] (시간이면 ms, 범주면 0..n-1)
+ * series[].dashed: 점선(전망치 등)
+ * events: { [index]: { color, mark, render(tipElement) } } — 툴팁에 내용을 덧붙이고, mark면 점도 찍음
  * opts: { formatX(x, i), formatY(v), xTicks(xs) => [{x, label}], zeroLine }
  */
-export function lineChart(container, { xs, series, formatX, formatY, xTicks, zeroLine = false }) {
+export function lineChart(container, { xs, series, formatX, formatY, xTicks, zeroLine = false, events = {} }) {
   container.replaceChildren();
   const rect = container.getBoundingClientRect();
   const W = Math.max(rect.width, 200), H = Math.max(rect.height, 160);
@@ -93,10 +95,18 @@ export function lineChart(container, { xs, series, formatX, formatY, xTicks, zer
       d += `${pen ? 'L' : 'M'}${px.toFixed(1)},${Y(v).toFixed(1)}`;
       pen = true;
     });
-    el('path', { d, fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg);
+    el('path', { d, fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+      ...(s.dashed ? { 'stroke-dasharray': '5 4' } : {}) }, svg);
     if (s.markers) {
       s.values.forEach((v, i) => v != null && el('circle', { cx: X(xs[i]), cy: Y(v), r: 4, fill: s.color, class: 'dot' }, svg));
     }
+  }
+
+  // 이벤트 표시 (데이터가 있는 첫 시리즈 위에)
+  const base = series[0];
+  const eventIdx = Object.keys(events).map(Number).filter(i => events[i].mark && base.values[i] != null).sort((a, b) => a - b);
+  for (const i of eventIdx) {
+    el('circle', { cx: X(xs[i]), cy: Y(base.values[i]), r: 4.5, fill: events[i].color, class: 'dot event' }, svg);
   }
 
   // 십자선 + 툴팁
@@ -111,7 +121,10 @@ export function lineChart(container, { xs, series, formatX, formatY, xTicks, zer
     const target = x0 + ((px - m.l) / plotW) * (x1 - x0);
     let a = 0, b = xs.length - 1;
     while (b - a > 1) { const mid = (a + b) >> 1; (xs[mid] < target ? (a = mid) : (b = mid)); }
-    return Math.abs(xs[a] - target) <= Math.abs(xs[b] - target) ? a : b;
+    const i = Math.abs(xs[a] - target) <= Math.abs(xs[b] - target) ? a : b;
+    // 이벤트 점 근처(10px)면 이벤트에 붙임
+    const ev = eventIdx.reduce((best, k) => (Math.abs(X(xs[k]) - px) < Math.abs(X(xs[best ?? k]) - px) ? k : best), null);
+    return ev != null && Math.abs(X(xs[ev]) - px) <= 10 ? ev : i;
   };
   let current = xs.length - 1;
   const show = i => {
@@ -145,8 +158,11 @@ export function lineChart(container, { xs, series, formatX, formatY, xTicks, zer
       }
       tip.appendChild(row);
     });
+    if (events[i]) events[i].render(tip);
+    tip.classList.toggle('wide', !!events[i]);
     tip.hidden = false;
-    const left = Math.min(Math.max(px, 70), W - 70);
+    const half = events[i] ? 140 : 70;
+    const left = Math.min(Math.max(px, half), W - half);
     tip.style.left = `${left}px`;
     const topV = Math.min(...series.map(s => s.values[i]).filter(v => v != null));
     tip.style.top = `${Math.max(Y(Math.max(...series.map(s => s.values[i] ?? topV))) - 10, 44)}px`;
@@ -167,6 +183,11 @@ export function lineChart(container, { xs, series, formatX, formatY, xTicks, zer
   svg.addEventListener('keydown', e => {
     if (e.key === 'ArrowLeft') { show(Math.max(0, current - 1)); e.preventDefault(); }
     if (e.key === 'ArrowRight') { show(Math.min(xs.length - 1, current + 1)); e.preventDefault(); }
+    if (e.key === 'PageUp' || e.key === 'PageDown') {
+      const next = e.key === 'PageDown' ? eventIdx.find(k => k > current) : [...eventIdx].reverse().find(k => k < current);
+      if (next != null) show(next);
+      e.preventDefault();
+    }
   });
 }
 

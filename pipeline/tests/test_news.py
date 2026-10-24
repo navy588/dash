@@ -35,6 +35,7 @@ def test_parse_rss_strips_source():
     [h] = news.parse_rss(xml)
     assert h == {"title": "코스피 2% 급락… 외국인 매도", "url": "https://news.example/a",
                  "source": "한국경제", "published": "2026-10-23"}
+    assert news.clean_title("[뉴욕채권] 국채가 하락…유가 급등 |") == "[뉴욕채권] 국채가 하락…유가 급등"
 
 
 def test_build_notes_reuses_previous(tmp_path, monkeypatch):

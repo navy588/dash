@@ -58,6 +58,11 @@ def google_news(query, date, session):
     return parse_rss(r.text)
 
 
+def clean_title(title):
+    """'제목 | 매체'에서 매체가 잘린 뒤 남는 꼬리 기호를 지웁니다."""
+    return title.rstrip(" |·-").strip()
+
+
 def parse_rss(text, limit=HEADLINES):
     root = ET.fromstring(text)
     out = []
@@ -66,6 +71,7 @@ def parse_rss(text, limit=HEADLINES):
         source = (item.findtext("source") or "").strip()
         if source and title.endswith(f" - {source}"):
             title = title[: -len(source) - 3].strip()
+        title = clean_title(title)
         published = item.findtext("pubDate")
         try:
             published = parsedate_to_datetime(published).strftime("%Y-%m-%d") if published else None
@@ -117,7 +123,7 @@ def build_notes(registry, data_dir, previous_url=None, search=google_news,
             key = d.strftime("%Y-%m-%d")
             ev = {"date": key, "change": None if ch is None else round(ch, 4), "sigma": sg, "headlines": []}
             if prev.get(key, {}).get("headlines"):
-                ev["headlines"] = prev[key]["headlines"]
+                ev["headlines"] = [{**h, "title": clean_title(h.get("title", ""))} for h in prev[key]["headlines"]]
                 stats["cached"] += 1
             else:
                 queue.append((d, ind, ev))

@@ -4,67 +4,61 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>글로벌 경제 데일리</title>
-  <meta name="description" content="주가지수·환율·금리·원자재·미국 거시지표를 매일 자동으로 모아 보여 주는 대시보드">
-  <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#141413" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="주가지수·환율·금리·원자재·미국 거시지표를 매일 자동으로 모아 무엇이 왜 움직였는지 보여 주는 대시보드">
+  <meta name="theme-color" content="#f6f6f4" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111110" media="(prefers-color-scheme: dark)">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23141413'/%3E%3Cpath d='M6 22l6-7 5 4 9-11' stroke='%23fff' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="style.css">
   <script type="module" src="app.js"></script>
 </head>
 <body>
   <header class="top">
     <div class="wrap top-inner">
-      <div>
+      <div class="brand">
         <h1>글로벌 경제 데일리</h1>
         <p class="updated" id="updated">불러오는 중…</p>
       </div>
-      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="밝은 화면과 어두운 화면 전환"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
+      <nav class="jump" id="jump" aria-label="분야 바로가기"></nav>
+      <button class="icon-btn" id="theme-toggle" type="button" aria-label="밝은 화면과 어두운 화면 전환"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg></button>
     </div>
   </header>
 
   <main class="wrap" id="main">
     <div class="notice" id="notice" hidden></div>
 
-    <section aria-labelledby="briefing-title" class="block" id="briefing-block" hidden>
-      <h2 id="briefing-title">오늘의 브리핑</h2>
-      <div class="card briefing">
-        <p class="briefing-headline" id="briefing-headline"></p>
-        <h3>무엇이 왜 움직였나</h3>
-        <ul class="briefing-list" id="briefing-list"></ul>
-        <div hidden><h3>시장 해석</h3><ul class="briefing-list" id="briefing-reads"></ul></div>
-        <div hidden><h3>눈여겨볼 점</h3><ul class="briefing-list" id="briefing-signals"></ul></div>
+    <section class="hero" aria-labelledby="briefing-headline">
+      <div class="today" id="briefing-block" hidden>
+        <p class="eyebrow"><span id="briefing-asof"></span><span class="mood" id="briefing-mood" hidden></span></p>
+        <h2 class="headline" id="briefing-headline"></h2>
+        <ol class="stories" id="briefing-list"></ol>
+        <div class="reads-wrap" hidden><h3 class="label">시장 해석</h3><ul class="reads" id="briefing-reads"></ul></div>
+        <details class="signals-wrap" hidden>
+          <summary><span class="label">눈여겨볼 점</span> <span class="count" id="briefing-signal-count"></span></summary>
+          <ul class="signals" id="briefing-signals"></ul>
+        </details>
       </div>
+      <aside class="panel keys" aria-labelledby="keys-title">
+        <h3 class="label" id="keys-title">핵심 지표</h3>
+        <div id="keys"></div>
+      </aside>
     </section>
 
-    <section aria-labelledby="movers-title" class="block">
-      <h2 id="movers-title">오늘의 큰 움직임</h2>
-      <p class="hint">최근 1년 동안의 하루 변동폭과 비교해 평소보다 2배 이상 크게 움직인 지표입니다.</p>
-      <div class="movers" id="movers"></div>
-    </section>
+    <div class="boards" id="groups"></div>
 
-    <div class="period" role="radiogroup" aria-label="변화 기준 기간" id="period">
-      <button type="button" role="radio" data-period="prev" aria-checked="true">직전 대비</button>
-      <button type="button" role="radio" data-period="w1" aria-checked="false">1주</button>
-      <button type="button" role="radio" data-period="m1" aria-checked="false">1개월</button>
-      <button type="button" role="radio" data-period="ytd" aria-checked="false">연초 대비</button>
-      <button type="button" role="radio" data-period="y1" aria-checked="false">1년</button>
-    </div>
-
-    <div id="groups"></div>
-
-    <section aria-labelledby="curve-title" class="block" id="curve-block">
-      <h2 id="curve-title">미국 국채 금리 커브</h2>
-      <p class="hint">만기별 금리입니다. 짧은 만기가 긴 만기보다 높으면(역전) 경기 둔화 신호로 봅니다.</p>
-      <div class="card chart-card">
-        <div class="legend" id="curve-legend"></div>
-        <div class="chart" id="curve-chart"></div>
+    <section class="panel curve" aria-labelledby="curve-title" id="curve-block">
+      <div class="panel-head">
+        <h2 id="curve-title">미국 국채 금리 커브</h2>
+        <p class="hint">짧은 만기가 긴 만기보다 높으면(역전) 경기 둔화 신호로 봅니다.</p>
       </div>
+      <div class="legend" id="curve-legend"></div>
+      <div class="chart" id="curve-chart"></div>
     </section>
   </main>
 
   <footer class="wrap foot">
-    <p>데이터: <a href="https://fred.stlouisfed.org/">FRED</a>(세인트루이스 연준), Yahoo Finance, LME(westmetall), <a href="https://data.bis.org/">BIS</a>(기준금리), Google 뉴스. 매일 07시·16시 30분(한국시간)에 자동 갱신됩니다.</p>
-    <p>시세는 지연되거나 수정될 수 있으며 투자 판단의 근거로 쓰기 위한 자료가 아닙니다.</p>
+    <p>데이터: <a href="https://fred.stlouisfed.org/">FRED</a>(세인트루이스 연준), Yahoo Finance, LME(westmetall), <a href="https://data.bis.org/">BIS</a>(기준금리), Google 뉴스. 매일 07:00·16:30(한국시간)에 자동 갱신됩니다.</p>
+    <p>표의 행을 누르면 장기 차트와 날짜별 관련 뉴스가 열립니다. 상승은 빨강, 하락은 파랑입니다. 시세는 지연되거나 수정될 수 있으며 투자 판단의 근거로 쓰기 위한 자료가 아닙니다.</p>
   </footer>
 
   <dialog id="detail" aria-labelledby="detail-title">
@@ -73,9 +67,9 @@
         <h2 id="detail-title"></h2>
         <p class="detail-sub" id="detail-sub"></p>
       </div>
-      <button type="button" class="close" id="detail-close" aria-label="닫기">✕</button>
+      <button type="button" class="icon-btn" id="detail-close" aria-label="닫기">✕</button>
     </div>
-    <div class="ranges" role="radiogroup" aria-label="차트 기간" id="ranges">
+    <div class="seg" role="radiogroup" aria-label="차트 기간" id="ranges">
       <button type="button" role="radio" data-range="3m" aria-checked="false">3개월</button>
       <button type="button" role="radio" data-range="1y" aria-checked="true">1년</button>
       <button type="button" role="radio" data-range="3y" aria-checked="false">3년</button>

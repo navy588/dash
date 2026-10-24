@@ -39,7 +39,7 @@ def find_events(series, ind, lookback_days=LOOKBACK_DAYS):
                         index=series.index[1:], dtype=float)
     window = {"daily": 250, "weekly": 52, "monthly": 12, "quarterly": 8}[ind["freq"]]
     std = changes.shift(1).rolling(window, min_periods=max(window // 2, 4)).std()
-    recent = changes[changes.index > series.index[-1] - pd.Timedelta(days=lookback_days)]
+    recent = changes[changes.index > series.index[-1] - pd.DateOffset(days=lookback_days)]
     out = []
     for d, ch in recent.items():
         sd = std.get(d)

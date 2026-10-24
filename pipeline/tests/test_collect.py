@@ -84,7 +84,7 @@ def test_main_fails_when_nothing_collected(monkeypatch, tmp_path):
     monkeypatch.setattr(collect, "fetch_fred", boom)
     monkeypatch.setattr(collect, "fetch_yahoo", boom)
     monkeypatch.setattr(collect, "collect", lambda reg, **kw: collect.__dict__["_orig_collect"](
-        reg, fetch_fred=boom, fetch_yahoo=boom, fetch_previous=lambda *a, **k: None, log=lambda *_: None))
+        reg, fetch_fred=boom, fetch_yahoo=boom, fetch_lme=boom, fetch_previous=lambda *a, **k: None, log=lambda *_: None))
     assert collect.main(["--out", str(tmp_path)]) == 1
     assert not (tmp_path / "latest.json").exists()
 

@@ -8,11 +8,11 @@
 ## 화면
 
 - **업데이트 시각:** 맨 위에 마지막 업데이트 시각과 다음 업데이트 시각(한국시간)을 표시합니다.
-- **오늘의 브리핑:** 큰 움직임과 분야별 대표 지표를 한국어 문장으로 요약합니다. `data/briefing.md`(마크다운)로도 받을 수 있습니다.
+- **오늘의 브리핑:** AI 없이 규칙으로 해석합니다. 평소보다 크게 움직인 지표와 그날 뉴스 헤드라인(무엇이 왜 움직였나), 위험선호/위험회피 판정·미 국채 커브 모양(불·베어 스티프닝/플래트닝)·유가와 금리 조합(시장 해석), 52주 신고가·신저가·연속 상승/하락·연초 대비 최고/최저 자산·전망치 대비 실제치(눈여겨볼 점). `data/briefing.md`로도 받을 수 있습니다.
 - **오늘의 큰 움직임:** 직전 대비 변화가 최근 1년 평균 변동폭(표준편차)의 2배를 넘은 지표만 모아 보여 줍니다.
-- **분야별 카드:** 미국 거시지표, 한국, 미국 주식, 글로벌 주식, 환율, 금리, 원자재·코인 순서입니다. 직전·1주·1개월·연초·1년 대비 변화를 고를 수 있고,
+- **분야별 카드:** 미국 거시지표, 한국(주가), 미국 주식, 글로벌 주식, 환율, 금리, 원자재·코인 순서입니다. 직전·1주·1개월·연초·1년 대비 변화를 고를 수 있고,
   일별 지표는 전일과 1주 변화를 함께 보여 줍니다. 상승은 빨강 ▲, 하락은 파랑 ▼(추세선 색도 동일)이고, 카드마다 기준일을 표시합니다.
-- **원자재:** WTI, 유럽 천연가스(TTF), 구리·알루미늄·니켈(LME 현금 결제가, $/t), 브렌트, 미국 천연가스, 금, 은, 비트코인 순서입니다.
+- **원자재:** WTI, 유럽 천연가스(TTF, 유로/달러로 환산한 $/MMBtu), 아시아 LNG(JKM, $/MMBtu), 구리·알루미늄·니켈(LME 현금 결제가, $/t), 브렌트, 미국 천연가스, 금, 은, 비트코인 순서입니다.
 - **전망치:** 기준금리·실업률·근원 PCE는 FOMC 점도표 중간값, 실질 GDP는 애틀랜타 연은 GDPNow를 차트에 점선으로 이어 그립니다.
 - **상세 차트와 "왜 움직였나":** 카드를 누르면 차트와 표가 열립니다. 차트의 각 날짜에 커서를 대면 그날의 변화와 관련 뉴스 헤드라인이 보이고,
   평소보다 크게(2배 이상) 움직인 날은 점으로 표시됩니다. 아래에는 날짜별 변화와 뉴스 링크 목록이 있습니다.
@@ -24,7 +24,7 @@
 pipeline/indicators.json   지표 정의 (이름·그룹·출처·코드·단위·변화 표시 방식) — 지표 추가/삭제는 여기만 고치면 됩니다
 pipeline/collect.py        수집 → site/data/*.json 생성
 pipeline/news.py           지표·날짜별 관련 뉴스 헤드라인 (Google 뉴스 RSS, 키 불필요)
-pipeline/briefing.py       latest.json → 한국어 일일 브리핑 (data/briefing.json, briefing.md)
+pipeline/briefing.py       latest.json·series·notes → 한국어 일일 브리핑 (data/briefing.json, briefing.md)
 pipeline/health.py         연속 실패 지표 판별 (알림용)
 pipeline/tests/            단위 테스트, 가짜 데이터로 화면을 띄우는 브라우저 테스트
 site/                      정적 페이지 (HTML·CSS·JS, 외부 라이브러리 없음)
@@ -52,7 +52,7 @@ PR에서는 테스트와 실제 수집까지만 하고 배포하지 않습니다
 - `data/indicators.json`: 지표 정의 사본
 - `data/notes/<id>.json`: `{ "id", "query", "events": [{ "date", "change", "sigma", "headlines": [{ "title", "url", "source", "published" }] }] }`
 - 전망치가 있는 지표는 `latest.json`의 `forecast: { label, points: [{ date, value }] }`
-- `data/briefing.json`: `as_of`, `headline`, `highlights[]`(`id`, `text`), `sections[]`(`group`, `name`, `text`), `stale[]` / `data/briefing.md`: 같은 마크다운
+- `data/briefing.json`: `as_of`, `headline`, `mood`, `stories[]`(`id`, `big`, `text`, `headlines[]`), `reads[]`, `signals[]`, `stale[]` / `data/briefing.md`: 같은 마크다운
 
 ## 처음 한 번만 할 일
 

@@ -138,6 +138,12 @@ button.tile:hover { border-color: var(--ink-3); }
 .briefing-headline { margin: 0 0 8px; font-weight: 600; }
 .briefing-list { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 14px; line-height: 1.6; }
 .briefing-list b { color: var(--ink); font-weight: 600; }
+.briefing h3 { margin: 12px 0 4px; font-size: 13px; font-weight: 600; color: var(--ink-3); }
+.briefing-list > li { margin-bottom: 4px; }
+.briefing-list .headlines { margin: 2px 0 6px; padding-left: 16px; font-size: 13px; }
+.linklike { all: unset; cursor: pointer; color: var(--ink); }
+.linklike:hover { text-decoration: underline; }
+.linklike:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
 .movers .empty { color: var(--ink-3); font-size: 14px; padding: 12px; }
 
 .chart-card { padding: 12px; }

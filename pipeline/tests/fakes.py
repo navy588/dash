@@ -39,3 +39,15 @@ def fake_lme(code, session=None):
 def fake_news(query, date, session=None):
     return [{"title": f"{query} 관련 뉴스 {date:%m/%d} #{k}", "url": f"https://example.com/{k}",
              "source": "테스트일보", "published": date.strftime("%Y-%m-%d")} for k in range(1, 3)]
+
+
+def fake_bis(code, session=None):
+    idx = pd.bdate_range("2009-01-01", "2026-10-23")
+    return pd.Series(np.where(idx < pd.Timestamp("2025-05-29"), 2.75, 2.5), index=idx)
+
+
+BIS_CSV = """FREQ,REF_AREA,TIME_PERIOD,OBS_VALUE
+D,KR,2026-10-21,2.5
+D,KR,2026-10-22,2.5
+D,KR,2026-10-23,
+"""

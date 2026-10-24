@@ -7,7 +7,7 @@ import subprocess
 import os
 
 # 1) BEA API 세팅
-BEA_API_KEY = "1A43CED6-707A-4E61-B475-A31AAB37AD01"
+BEA_API_KEY = os.environ.get("BEA_API_KEY", "")
 BEA_BASE_URL = "https://apps.bea.gov/api/data"
 Q_MAP = {'Q1':'-03-31','Q2':'-06-30','Q3':'-09-30','Q4':'-12-31'}
 
@@ -34,7 +34,7 @@ def fetch_bea(table):
     return df[['Date','LineDescription','Value']]
 
 # 2) FRED API 세팅
-FRED_API_KEY = "fb40b5238c2c5ff6b281706029681f15"
+FRED_API_KEY = os.environ.get("FRED_API_KEY")
 fred = Fred(api_key=FRED_API_KEY)
 
 def load_fred_series(codes):

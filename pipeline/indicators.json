@@ -1,0 +1,73 @@
+{
+  "groups": [
+    {"id": "korea",     "name": "한국"},
+    {"id": "us",        "name": "미국 주식"},
+    {"id": "global",    "name": "글로벌 주식"},
+    {"id": "fx",        "name": "환율"},
+    {"id": "rates",     "name": "금리"},
+    {"id": "commodity", "name": "원자재·코인"},
+    {"id": "macro",     "name": "미국 거시지표"}
+  ],
+  "indicators": [
+    {"id": "kospi",   "name": "코스피",        "group": "korea", "source": "yahoo", "code": "^KS11",  "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+    {"id": "kosdaq",  "name": "코스닥",        "group": "korea", "source": "yahoo", "code": "^KQ11",  "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+    {"id": "usdkrw",  "name": "원/달러",       "group": "korea", "source": "yahoo", "code": "KRW=X",  "freq": "daily", "unit": "원", "decimals": 1, "change": "pct"},
+    {"id": "jpykrw",  "name": "원/100엔",      "group": "korea", "source": "yahoo", "code": "JPYKRW=X", "freq": "daily", "unit": "원", "decimals": 2, "change": "pct", "scale": 100},
+
+    {"id": "spx",     "name": "S&P 500",       "group": "us", "source": "yahoo", "code": "^GSPC", "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+    {"id": "nasdaq",  "name": "나스닥",        "group": "us", "source": "yahoo", "code": "^IXIC", "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+    {"id": "dow",     "name": "다우존스",      "group": "us", "source": "yahoo", "code": "^DJI",  "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+    {"id": "sox",     "name": "필라델피아 반도체", "group": "us", "source": "yahoo", "code": "^SOX", "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+    {"id": "vix",     "name": "VIX 변동성",    "group": "us", "source": "yahoo", "code": "^VIX",  "freq": "daily", "unit": "pt", "decimals": 2, "change": "abs"},
+
+    {"id": "nikkei",  "name": "닛케이 225",    "group": "global", "source": "yahoo", "code": "^N225",     "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+    {"id": "shanghai","name": "상해종합",      "group": "global", "source": "yahoo", "code": "000001.SS", "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+    {"id": "hangseng","name": "항셍",          "group": "global", "source": "yahoo", "code": "^HSI",      "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+    {"id": "taiex",   "name": "대만 가권",     "group": "global", "source": "yahoo", "code": "^TWII",     "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+    {"id": "stoxx50", "name": "유로스톡스 50", "group": "global", "source": "yahoo", "code": "^STOXX50E", "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+    {"id": "dax",     "name": "독일 DAX",      "group": "global", "source": "yahoo", "code": "^GDAXI",    "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+    {"id": "ftse",    "name": "영국 FTSE 100", "group": "global", "source": "yahoo", "code": "^FTSE",     "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+
+    {"id": "dxy",     "name": "달러인덱스",    "group": "fx", "source": "yahoo", "code": "DX-Y.NYB", "freq": "daily", "unit": "pt", "decimals": 2, "change": "pct"},
+    {"id": "eurusd",  "name": "유로/달러",     "group": "fx", "source": "yahoo", "code": "EURUSD=X", "freq": "daily", "unit": "$",  "decimals": 4, "change": "pct"},
+    {"id": "usdjpy",  "name": "엔/달러",       "group": "fx", "source": "yahoo", "code": "JPY=X",    "freq": "daily", "unit": "엔", "decimals": 2, "change": "pct"},
+    {"id": "usdcny",  "name": "위안/달러",     "group": "fx", "source": "yahoo", "code": "CNY=X",    "freq": "daily", "unit": "위안", "decimals": 4, "change": "pct"},
+    {"id": "gbpusd",  "name": "파운드/달러",   "group": "fx", "source": "yahoo", "code": "GBPUSD=X", "freq": "daily", "unit": "$",  "decimals": 4, "change": "pct"},
+
+    {"id": "fedfunds","name": "미 기준금리(상단)", "group": "rates", "source": "fred", "code": "DFEDTARU", "freq": "daily", "unit": "%", "decimals": 2, "change": "bp"},
+    {"id": "ust3m",   "name": "미 국채 3개월", "group": "rates", "source": "fred", "code": "DGS3MO", "freq": "daily", "unit": "%", "decimals": 2, "change": "bp"},
+    {"id": "ust2y",   "name": "미 국채 2년",   "group": "rates", "source": "fred", "code": "DGS2",   "freq": "daily", "unit": "%", "decimals": 2, "change": "bp"},
+    {"id": "ust10y",  "name": "미 국채 10년",  "group": "rates", "source": "fred", "code": "DGS10",  "freq": "daily", "unit": "%", "decimals": 2, "change": "bp"},
+    {"id": "ust30y",  "name": "미 국채 30년",  "group": "rates", "source": "fred", "code": "DGS30",  "freq": "daily", "unit": "%", "decimals": 2, "change": "bp"},
+    {"id": "t10y2y",  "name": "장단기 금리차(10년-2년)", "group": "rates", "source": "fred", "code": "T10Y2Y", "freq": "daily", "unit": "%p", "decimals": 2, "change": "bp"},
+    {"id": "mortgage30","name": "30년 모기지 금리", "group": "rates", "source": "fred", "code": "MORTGAGE30US", "freq": "weekly", "unit": "%", "decimals": 2, "change": "bp"},
+
+    {"id": "wti",     "name": "WTI 유가",      "group": "commodity", "source": "yahoo", "code": "CL=F", "freq": "daily", "unit": "$", "decimals": 2, "change": "pct"},
+    {"id": "brent",   "name": "브렌트유",      "group": "commodity", "source": "yahoo", "code": "BZ=F", "freq": "daily", "unit": "$", "decimals": 2, "change": "pct"},
+    {"id": "natgas",  "name": "천연가스",      "group": "commodity", "source": "yahoo", "code": "NG=F", "freq": "daily", "unit": "$", "decimals": 3, "change": "pct"},
+    {"id": "gold",    "name": "금",            "group": "commodity", "source": "yahoo", "code": "GC=F", "freq": "daily", "unit": "$", "decimals": 1, "change": "pct"},
+    {"id": "silver",  "name": "은",            "group": "commodity", "source": "yahoo", "code": "SI=F", "freq": "daily", "unit": "$", "decimals": 2, "change": "pct"},
+    {"id": "copper",  "name": "구리",          "group": "commodity", "source": "yahoo", "code": "HG=F", "freq": "daily", "unit": "$", "decimals": 3, "change": "pct"},
+    {"id": "bitcoin", "name": "비트코인",      "group": "commodity", "source": "yahoo", "code": "BTC-USD", "freq": "daily", "unit": "$", "decimals": 0, "change": "pct"},
+
+    {"id": "cpi",     "name": "소비자물가(CPI) 상승률", "group": "macro", "source": "fred", "code": "CPIAUCSL", "freq": "monthly", "unit": "%", "decimals": 1, "change": "pp", "transform": "yoy"},
+    {"id": "corecpi", "name": "근원 CPI 상승률",   "group": "macro", "source": "fred", "code": "CPILFESL", "freq": "monthly", "unit": "%", "decimals": 1, "change": "pp", "transform": "yoy"},
+    {"id": "corepce", "name": "근원 PCE 상승률",   "group": "macro", "source": "fred", "code": "PCEPILFE", "freq": "monthly", "unit": "%", "decimals": 1, "change": "pp", "transform": "yoy"},
+    {"id": "breakeven5y","name": "5년 기대인플레이션", "group": "macro", "source": "fred", "code": "T5YIE", "freq": "daily", "unit": "%", "decimals": 2, "change": "bp"},
+    {"id": "unrate",  "name": "실업률",            "group": "macro", "source": "fred", "code": "UNRATE",   "freq": "monthly", "unit": "%", "decimals": 1, "change": "pp"},
+    {"id": "payrolls","name": "비농업 고용 증감",  "group": "macro", "source": "fred", "code": "PAYEMS",   "freq": "monthly", "unit": "천 명", "decimals": 0, "change": "abs", "transform": "diff"},
+    {"id": "claims",  "name": "신규 실업수당 청구", "group": "macro", "source": "fred", "code": "ICSA",    "freq": "weekly",  "unit": "건", "decimals": 0, "change": "pct"},
+    {"id": "gdp",     "name": "실질 GDP 성장률(연율)", "group": "macro", "source": "fred", "code": "A191RL1Q225SBEA", "freq": "quarterly", "unit": "%", "decimals": 1, "change": "pp"},
+    {"id": "gdpnow",  "name": "GDPNow 이번 분기 전망", "group": "macro", "source": "fred", "code": "GDPNOW", "freq": "quarterly", "unit": "%", "decimals": 1, "change": "pp"}
+  ],
+  "curve": [
+    {"label": "1개월", "months": 1,   "code": "DGS1MO"},
+    {"label": "3개월", "months": 3,   "code": "DGS3MO"},
+    {"label": "6개월", "months": 6,   "code": "DGS6MO"},
+    {"label": "1년",   "months": 12,  "code": "DGS1"},
+    {"label": "2년",   "months": 24,  "code": "DGS2"},
+    {"label": "5년",   "months": 60,  "code": "DGS5"},
+    {"label": "10년",  "months": 120, "code": "DGS10"},
+    {"label": "30년",  "months": 360, "code": "DGS30"}
+  ]
+}

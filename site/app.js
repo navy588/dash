@@ -60,6 +60,26 @@ function fmtDate(def, s) {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function periodShort(def, period) {
+  return period === 'prev' ? FREQ_PREV[def.freq] : PERIOD_LABEL[period].replace(' 대비', '');
+}
+
+function deltaSpan(def, c, label) {
+  const span = document.createElement('span');
+  const dir = direction(c);
+  span.className = `chg ${dir.cls}`;
+  const l = document.createElement('small');
+  l.textContent = label;
+  span.append(l, c ? ` ${dir.arrow} ${fmtChange(def, c)}` : ' –');
+  return span;
+}
+
+function fmtForecastDate(def, s) {
+  const d = parseDate(s);
+  if (def.freq === 'quarterly') return `${String(d.getFullYear()).slice(2)}년 ${Math.floor(d.getMonth() / 3) + 1}분기`;
+  return `${String(d.getFullYear()).slice(2)}년 말`;
+}
+
 function periodLabel(def, period) {
   return period === 'prev' ? FREQ_PREV[def.freq] + ' 대비' : PERIOD_LABEL[period];
 }
@@ -106,19 +126,34 @@ function tile(def, item, { showSigma = false } = {}) {
     value.appendChild(u);
   }
   b.appendChild(value);
-  b.appendChild(sparkline(item.spark));
 
   const period = showSigma ? 'prev' : state.period;
   const c = item.changes[period];
-  const delta = document.createElement('div');
   const dir = direction(c);
-  delta.className = `delta ${dir.cls}`;
-  delta.textContent = c ? `${dir.arrow} ${fmtChange(def, c)}` : '–';
+  b.appendChild(sparkline(item.spark, { color: `var(--${dir.cls})` }));
+
+  const delta = document.createElement('div');
+  delta.className = 'delta';
+  delta.appendChild(deltaSpan(def, c, periodShort(def, period)));
+  // 일별 지표는 주간 변화도 함께
+  if (period === 'prev' && def.freq === 'daily' && item.changes.w1) {
+    delta.append(' ');
+    delta.appendChild(deltaSpan(def, item.changes.w1, '1주'));
+  }
   b.appendChild(delta);
+
+  if (item.forecast?.points?.length) {
+    const fc = document.createElement('div');
+    fc.className = 'fc';
+    const p = item.forecast.points[0];
+    fc.textContent = `전망 ${fmtForecastDate(def, p.date)} ${withUnit(def, p.value)}`;
+    fc.title = item.forecast.label;
+    b.appendChild(fc);
+  }
 
   const date = document.createElement('div');
   date.className = 'date';
-  date.textContent = `${fmtDate(def, item.last.date)} 기준 · ${periodLabel(def, period)}`;
+  date.textContent = `${fmtDate(def, item.last.date)} 기준`;
   b.appendChild(date);
 
   b.setAttribute('aria-label', `${def.name} ${withUnit(def, item.last.value)}, ${periodLabel(def, period)} ${c ? fmtChange(def, c) + ' ' + dir.word : '변화 없음'}, ${fmtDate(def, item.last.date)} 기준. 자세히 보기`);
@@ -206,6 +241,41 @@ async function loadSeries(id) {
   return state.seriesCache.get(id);
 }
 
+state.notes = new Map();
+async function loadNotes(id) {
+  if (!state.notes.has(id)) {
+    try {
+      const r = await fetch(`${DATA}/notes/${id}.json`);
+      state.notes.set(id, r.ok ? (await r.json()).events : []);
+    } catch { state.notes.set(id, []); }
+  }
+  return state.notes.get(id);
+}
+
+function headlineList(ev, { links = false } = {}) {
+  const ul = document.createElement('ul');
+  ul.className = 'headlines';
+  for (const h of ev.headlines.slice(0, 3)) {
+    const li = document.createElement('li');
+    if (links && /^https?:\/\//.test(h.url)) {
+      const a = document.createElement('a');
+      a.href = h.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.textContent = h.title;
+      li.appendChild(a);
+    } else {
+      li.textContent = h.title;
+    }
+    if (h.source) {
+      const src = document.createElement('span');
+      src.className = 'muted';
+      src.textContent = ` · ${h.source}`;
+      li.appendChild(src);
+    }
+    ul.appendChild(li);
+  }
+  return ul;
+}
+
 const RANGE_DAYS = { '3m': 92, '1y': 366, '3y': 3 * 366, '10y': 10 * 366, all: Infinity };
 
 async function openDetail(id) {
@@ -222,7 +292,7 @@ async function openDetail(id) {
   const chartBox = document.getElementById('detail-chart');
   chartBox.textContent = '불러오는 중…';
   try {
-    const s = await loadSeries(id);
+    const [s] = await Promise.all([loadSeries(id), loadNotes(id)]);
     if (state.detail === id) drawDetail(def, s);
   } catch {
     chartBox.textContent = '시계열을 불러오지 못했습니다.';
@@ -230,6 +300,7 @@ async function openDetail(id) {
 }
 
 function drawDetail(def, s) {
+  const item = state.items.get(def.id);
   const lastT = parseDate(s.dates[s.dates.length - 1]).getTime();
   const from = lastT - RANGE_DAYS[state.range] * 864e5;
   const xs = [], vals = [], dates = [];
@@ -237,14 +308,93 @@ function drawDetail(def, s) {
     const t = parseDate(d).getTime();
     if (t >= from) { xs.push(t); vals.push(s.values[i]); dates.push(d); }
   });
+  const nActual = xs.length;
+
+  // 전망치: 마지막 실제값에서 이어지는 점선
+  const series = [{ name: def.name, color: cssVar('--ink-2'), values: vals.slice() }];
+  const fc = item?.forecast?.points || [];
+  if (fc.length) {
+    const fvals = new Array(nActual).fill(null);
+    fvals[nActual - 1] = vals[nActual - 1];
+    for (const p of fc) {
+      xs.push(parseDate(p.date).getTime()); dates.push(p.date);
+      series[0].values.push(null); fvals.push(p.value);
+    }
+    series.push({ name: `전망 (${item.forecast.label})`, color: cssVar('--series-1'), values: fvals, dashed: true, markers: true });
+  }
+
+  // 큰 움직임과 관련 뉴스
+  const events = {};
+  const notes = (state.notes.get(def.id) || []).filter(ev => ev.headlines?.length);
+  const idxByDate = new Map(dates.map((d, i) => [d, i]));
+  const evText = ev => {
+    if (ev.change == null) return '관련 뉴스';
+    const dir = direction({ value: ev.change });
+    const sig = ev.sigma != null ? ` · 평소의 ${fmtNum(Math.abs(ev.sigma), 1)}배` : '';
+    return `${FREQ_PREV[def.freq]} 대비 ${dir.arrow} ${fmtChange(def, { value: ev.change })}${sig}`;
+  };
+  for (const ev of notes) {
+    const i = idxByDate.get(ev.date);
+    if (i == null || i >= nActual) continue;
+    const dir = direction(ev.change == null ? null : { value: ev.change });
+    events[i] = {
+      color: `var(--${dir.cls})`,
+      mark: ev.sigma != null && Math.abs(ev.sigma) >= SIGMA_THRESHOLD,
+      render: tip => {
+        const head = document.createElement('div');
+        head.className = `why ${dir.cls}`;
+        head.textContent = `${evText(ev)} · 왜 움직였나`;
+        tip.append(head, headlineList(ev));
+      },
+    };
+  }
+
   lineChart(document.getElementById('detail-chart'), {
-    xs,
-    series: [{ name: def.name, color: cssVar('--series-1'), values: vals }],
-    formatX: (_, i) => fmtDate(def, dates[i]),
+    xs, series, events,
+    formatX: (_, i) => fmtDate(def, dates[i]) + (i >= nActual ? ' (전망)' : ''),
     formatY: v => (def.unit === '$' ? '$' : '') + fmtValue(def, v) + (def.unit === '%' || def.unit === '%p' ? '%' : ''),
     xTicks: timeTicks,
     zeroLine: vals.some(v => v < 0) && vals.some(v => v > 0),
   });
+
+  const legend = document.getElementById('detail-legend');
+  legend.replaceChildren();
+  if (fc.length) {
+    for (const [label, color, dashed] of [['실제', cssVar('--ink-2'), false], [`전망 · ${item.forecast.label}`, cssVar('--series-1'), true]]) {
+      const span = document.createElement('span');
+      const i = document.createElement('i');
+      i.style.background = dashed ? `repeating-linear-gradient(90deg, ${color} 0 5px, transparent 5px 9px)` : color;
+      span.append(i, label);
+      legend.appendChild(span);
+    }
+  }
+  if (Object.keys(events).length) {
+    const span = document.createElement('span');
+    span.className = 'muted';
+    span.textContent = '차트에 커서를 대면 그날 왜 움직였는지 관련 뉴스가 함께 나옵니다 (● 평소보다 크게 움직인 날)';
+    legend.appendChild(span);
+  }
+
+  // 시점별 변동 이유 목록 (링크 포함, 최근 순)
+  const list = document.getElementById('detail-events');
+  list.replaceChildren();
+  const shown = notes.filter(ev => idxByDate.has(ev.date) && idxByDate.get(ev.date) < nActual).reverse().slice(0, 30);
+  list.hidden = !shown.length;
+  if (shown.length) {
+    const h = document.createElement('h3');
+    h.textContent = '날짜별 변화와 관련 뉴스 (최근 30개)';
+    list.appendChild(h);
+    for (const ev of shown) {
+      const dir = direction(ev.change == null ? null : { value: ev.change });
+      const row = document.createElement('div');
+      row.className = 'event-row';
+      const when = document.createElement('div');
+      when.className = `when ${dir.cls}`;
+      when.textContent = `${fmtDate(def, ev.date)} · ${evText(ev)}`;
+      row.append(when, headlineList(ev, { links: true }));
+      list.appendChild(row);
+    }
+  }
 
   const table = document.getElementById('detail-table');
   table.replaceChildren();
@@ -292,6 +442,15 @@ function rerenderCharts() {
 let resizeTimer;
 addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(rerenderCharts, 150); });
 
+// 자동 갱신 시각: 매일 07:00, 16:30 (한국시간)
+function nextUpdate(from) {
+  const kstNow = new Date(Math.max(Date.now(), from.getTime()) + 9 * 36e5);
+  const mins = kstNow.getUTCHours() * 60 + kstNow.getUTCMinutes();
+  if (mins < 7 * 60) return '오늘 07:00';
+  if (mins < 16 * 60 + 30) return '오늘 16:30';
+  return '내일 07:00';
+}
+
 // ── 시작 ───────────────────────────────────────────────
 async function main() {
   const [reg, latest] = await Promise.all([
@@ -303,8 +462,9 @@ async function main() {
   for (const it of latest.indicators) if (it.last) state.items.set(it.id, it);
 
   const t = new Date(latest.generated_at);
+  const kst = { timeZone: 'Asia/Seoul' };
   document.getElementById('updated').textContent =
-    `${t.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' })} 갱신`;
+    `마지막 업데이트 ${t.toLocaleString('ko-KR', { ...kst, year: 'numeric', month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} (한국시간) · 다음 업데이트 ${nextUpdate(t)}`;
 
   const notice = document.getElementById('notice');
   const ageH = (Date.now() - t) / 36e5;

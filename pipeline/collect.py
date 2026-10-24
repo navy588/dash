@@ -87,6 +87,49 @@ def fetch_yahoo(codes):
     return out
 
 
+def fetch_lme(code, session=None):
+    """LME 현금 결제가(일별, $/t)를 westmetall.com 표에서 읽습니다. code 예: LME_Cu_cash"""
+    session = session or _session()
+    r = session.get("https://www.westmetall.com/en/markdaten.php", timeout=HTTP_TIMEOUT,
+                    params={"action": "table", "field": code})
+    r.raise_for_status()
+    return parse_lme_html(r.text)
+
+
+def parse_lme_html(html):
+    tables = pd.read_html(io.StringIO(html), thousands=",", decimal=".")
+    parts = []
+    for t in tables:
+        if t.shape[1] < 2:
+            continue
+        dates = pd.to_datetime(t.iloc[:, 0].astype(str).str.strip(), format="%d. %B %Y", errors="coerce")
+        values = pd.to_numeric(t.iloc[:, 1].astype(str).str.replace(",", ""), errors="coerce")
+        part = pd.Series(values.values, index=dates.values).dropna()
+        part = part[part.index.notna()]
+        if len(part):
+            parts.append(part)
+    if not parts:
+        raise ValueError("LME 표를 찾지 못했습니다")
+    s = pd.concat(parts)
+    s = s[~s.index.duplicated(keep="first")].sort_index()
+    return s[s.index >= FETCH_START].astype(float)
+
+
+def forecast_points(raw, ind, last_date):
+    """전망 시계열을 실제치 마지막 날짜 이후의 점들로 바꿉니다.
+
+    FOMC 전망(…MD)은 연도별 값이라 그 해 12월(일별 지표는 12월 31일)에 놓고,
+    GDPNow처럼 분기별 값은 날짜 그대로 씁니다.
+    """
+    pts = []
+    for d, v in raw.items():
+        if ind["forecast"]["code"].endswith("MD"):
+            d = pd.Timestamp(year=d.year, month=12, day=31 if ind["freq"] == "daily" else 1)
+        if d > last_date:
+            pts.append({"date": d.strftime("%Y-%m-%d"), "value": round(float(v), 4)})
+    return pts
+
+
 def fetch_previous(base_url, ind_id, session=None):
     """직전 배포본의 시계열을 pd.Series로. 없으면 None."""
     if not base_url:
@@ -189,12 +232,14 @@ def build_curve(curve_def, fred_raw):
 # ── 전체 실행 ───────────────────────────────────────────────
 
 def collect(registry, fred_key=None, previous_url=None,
-            fetch_fred=fetch_fred, fetch_yahoo=fetch_yahoo, fetch_previous=fetch_previous, log=print):
+            fetch_fred=fetch_fred, fetch_yahoo=fetch_yahoo, fetch_previous=fetch_previous,
+            fetch_lme=fetch_lme, log=print):
     inds = registry["indicators"]
     errors = {}
 
     # FRED (지표 + 금리 커브)
     fred_codes = list(dict.fromkeys([i["code"] for i in inds if i["source"] == "fred"] +
+                                    [i["forecast"]["code"] for i in inds if i.get("forecast")] +
                                     [p["code"] for p in registry.get("curve", [])]))
     fred_raw = {}
     session = _session()
@@ -217,7 +262,18 @@ def collect(registry, fred_key=None, previous_url=None,
             errors.setdefault(code, "데이터 없음")
     log(f"Yahoo: {len(yahoo_raw)}/{len(yahoo_codes)}개 수집")
 
-    raw = {**fred_raw, **yahoo_raw}
+    # LME (westmetall)
+    lme_codes = [i["code"] for i in inds if i["source"] == "lme"]
+    lme_raw = {}
+    for code in lme_codes:
+        try:
+            lme_raw[code] = fetch_lme(code)
+        except Exception as e:  # noqa: BLE001
+            errors[code] = str(e)[:200]
+    if lme_codes:
+        log(f"LME: {len(lme_raw)}/{len(lme_codes)}개 수집")
+
+    raw = {**fred_raw, **yahoo_raw, **lme_raw}
     series, items = {}, []
     for ind in inds:
         status, s = "ok", None
@@ -233,6 +289,11 @@ def collect(registry, fred_key=None, previous_url=None,
         if status != "missing":
             series[ind["id"]] = s
             item.update(summarize(s, ind))
+            fc = ind.get("forecast")
+            if fc and fc["code"] in fred_raw:
+                pts = forecast_points(fred_raw[fc["code"]], ind, s.index[-1])
+                if pts:
+                    item["forecast"] = {"label": fc["label"], "points": pts}
         if status != "ok":
             item["error"] = errors.get(ind["code"], errors.get("yahoo", "알 수 없음"))
         items.append(item)

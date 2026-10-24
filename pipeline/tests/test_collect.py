@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import collect  # noqa: E402
-from fakes import daily, fake_fred, fake_yahoo  # noqa: E402
+from fakes import daily, fake_fred, fake_lme, fake_yahoo  # noqa: E402
 
 REG = collect.load_registry()
 
@@ -22,13 +22,13 @@ def test_registry_is_consistent():
     assert len(ids) == len(set(ids))
     for i in REG["indicators"]:
         assert i["group"] in groups
-        assert i["source"] in ("fred", "yahoo")
+        assert i["source"] in ("fred", "yahoo", "lme")
         assert i["freq"] in collect.START
         assert i["change"] in ("pct", "bp", "pp", "abs")
 
 
 def test_collect_all_ok(tmp_path):
-    latest, series = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, log=lambda *_: None)
+    latest, series = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme, log=lambda *_: None)
     assert latest["counts"] == {"ok": len(REG["indicators"]), "stale": 0, "missing": 0}
     by_id = {i["id"]: i for i in latest["indicators"]}
     # 전년비 변환: 매월 0.2% 상승 → 연 2.43%
@@ -48,7 +48,7 @@ def test_collect_all_ok(tmp_path):
 
     collect.write_output(tmp_path, REG, latest, series)
     data = json.loads((tmp_path / "latest.json").read_text(encoding="utf-8"))
-    assert data["indicators"][0]["id"] == "kospi"
+    assert data["indicators"][0]["id"] == REG["indicators"][0]["id"]
     one = json.loads((tmp_path / "series" / "kospi.json").read_text(encoding="utf-8"))
     assert len(one["dates"]) == len(one["values"])
     assert (tmp_path / "indicators.json").exists()
@@ -69,7 +69,7 @@ def test_failures_fall_back_to_previous():
         return prev if ind_id in ("kospi", "ust10y") else None
 
     latest, series = collect.collect(REG, previous_url="https://example", fetch_fred=broken_fred,
-                                     fetch_yahoo=flaky_yahoo, fetch_previous=previous, log=lambda *_: None)
+                                     fetch_yahoo=flaky_yahoo, fetch_previous=previous, fetch_lme=fake_lme, log=lambda *_: None)
     by_id = {i["id"]: i for i in latest["indicators"]}
     assert by_id["kospi"]["status"] == "stale" and by_id["kospi"]["error"] == "데이터 없음"
     assert by_id["ust10y"]["status"] == "stale" and "503" in by_id["ust10y"]["error"]
@@ -107,3 +107,25 @@ def test_only_repeated_failures_are_reported():
     prev = {"indicators": [{"id": "a", "status": "stale"}, {"id": "b", "status": "ok"}, {"id": "c", "status": "stale"}]}
     assert health.persistent_problems(cur, prev) == ["a (stale: x)"]
     assert health.persistent_problems(cur, None) == []
+
+
+def test_forecast_points_follow_last_actual():
+    latest, _ = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme,
+                                log=lambda *_: None)
+    by_id = {i["id"]: i for i in latest["indicators"]}
+    ff = by_id["fedfunds"]["forecast"]
+    assert [p["date"] for p in ff["points"]] == ["2026-12-31", "2027-12-31", "2028-12-31"]
+    assert [p["date"] for p in by_id["unrate"]["forecast"]["points"]][0] == "2026-12-01"
+    assert by_id["gdp"]["forecast"]["points"] == [{"date": "2026-07-01", "value": 2.4}]
+    assert "forecast" not in by_id["kospi"]
+    assert by_id["copper"]["status"] == "ok"
+
+
+def test_parse_lme_html():
+    html = """<table><tr><th>date</th><th>LME Copper Cash-Settlement</th><th>3-month</th></tr>
+    <tr><td>23. October 2026</td><td>13,045.50</td><td>13,100.00</td></tr>
+    <tr><td>22. October 2026</td><td>12,980.00</td><td>13,010.00</td></tr></table>
+    <table><tr><th>date</th><th>x</th></tr><tr><td>31. December 2025</td><td>11,800.00</td></tr></table>"""
+    s = collect.parse_lme_html(html)
+    assert list(s.index.strftime("%Y-%m-%d")) == ["2025-12-31", "2026-10-22", "2026-10-23"]
+    assert s.iloc[-1] == pytest.approx(13045.5)

@@ -5,6 +5,8 @@
 지표 목록은 pipeline/indicators.json 한 곳에서 관리합니다.
 - FRED: FRED_API_KEY가 있으면 공식 API, 없으면 키가 필요 없는 fredgraph CSV를 사용합니다.
 - Yahoo Finance: yfinance로 일별 종가를 받습니다.
+- LME 금속: westmetall.com의 LME 현금 결제가 표를 읽습니다.
+- 각국 기준금리: BIS(국제결제은행) 공개 통계 API, 키 불필요.
 - 수집에 실패한 지표는 PREVIOUS_DATA_URL(직전 배포본)의 값을 그대로 쓰고 status를 "stale"로 표시합니다.
 
 출력
@@ -115,6 +117,25 @@ def parse_lme_html(html):
     return s[s.index >= FETCH_START].astype(float)
 
 
+def fetch_bis(code, session=None):
+    """BIS 중앙은행 정책금리(WS_CBPOL). code 예: D.KR (일별, 한국)"""
+    session = session or _session()
+    r = session.get(f"https://stats.bis.org/api/v1/data/WS_CBPOL/{code}", timeout=HTTP_TIMEOUT,
+                    params={"format": "csv", "startPeriod": FETCH_START})
+    r.raise_for_status()
+    return parse_bis_csv(r.text)
+
+
+def parse_bis_csv(text):
+    df = pd.read_csv(io.StringIO(text))
+    s = pd.Series(pd.to_numeric(df["OBS_VALUE"], errors="coerce").values,
+                  index=pd.to_datetime(df["TIME_PERIOD"], errors="coerce"))
+    s = s[s.index.notna()].dropna().sort_index()
+    if not len(s):
+        raise ValueError("BIS 데이터가 비어 있습니다")
+    return s.astype(float)
+
+
 def forecast_points(raw, ind, last_date):
     """전망 시계열을 실제치 마지막 날짜 이후의 점들로 바꿉니다.
 
@@ -147,8 +168,13 @@ def fetch_previous(base_url, ind_id, session=None):
 
 # ── 가공 ────────────────────────────────────────────────────
 
-def transform(raw, ind):
+def transform(raw, ind, fx=None):
     s = raw.astype(float)
+    if ind.get("fx"):  # 통화 환산 (예: €/MWh × 유로/달러 → $/MWh)
+        if fx is None:
+            raise ValueError(f"환율 {ind['fx']} 없음")
+        rate = fx.reindex(s.index.union(fx.index)).ffill().reindex(s.index)
+        s = (s * rate).dropna()
     t = ind.get("transform")
     if t == "yoy":
         s = (s / s.shift(12) - 1) * 100 if ind["freq"] == "monthly" else (s / s.shift(4) - 1) * 100
@@ -233,7 +259,7 @@ def build_curve(curve_def, fred_raw):
 
 def collect(registry, fred_key=None, previous_url=None,
             fetch_fred=fetch_fred, fetch_yahoo=fetch_yahoo, fetch_previous=fetch_previous,
-            fetch_lme=fetch_lme, log=print):
+            fetch_lme=fetch_lme, fetch_bis=fetch_bis, log=print):
     inds = registry["indicators"]
     errors = {}
 
@@ -273,13 +299,24 @@ def collect(registry, fred_key=None, previous_url=None,
     if lme_codes:
         log(f"LME: {len(lme_raw)}/{len(lme_codes)}개 수집")
 
-    raw = {**fred_raw, **yahoo_raw, **lme_raw}
+    # BIS 정책금리
+    bis_codes = [i["code"] for i in inds if i["source"] == "bis"]
+    bis_raw = {}
+    for code in bis_codes:
+        try:
+            bis_raw[code] = fetch_bis(code)
+        except Exception as e:  # noqa: BLE001
+            errors[code] = str(e)[:200]
+    if bis_codes:
+        log(f"BIS: {len(bis_raw)}/{len(bis_codes)}개 수집")
+
+    raw = {**fred_raw, **yahoo_raw, **lme_raw, **bis_raw}
     series, items = {}, []
     for ind in inds:
         status, s = "ok", None
         if ind["code"] in raw:
             try:
-                s = transform(raw[ind["code"]], ind)
+                s = transform(raw[ind["code"]], ind, raw.get(ind.get("fx")))
             except Exception as e:  # noqa: BLE001
                 errors[ind["code"]] = f"가공 실패: {e}"
         if s is None or len(s) < 2:

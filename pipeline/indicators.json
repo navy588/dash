@@ -172,31 +172,6 @@
    "news": "코스닥"
   },
   {
-   "id": "usdkrw",
-   "name": "원/달러",
-   "group": "korea",
-   "source": "yahoo",
-   "code": "KRW=X",
-   "freq": "daily",
-   "unit": "원",
-   "decimals": 1,
-   "change": "pct",
-   "news": "원달러 환율"
-  },
-  {
-   "id": "jpykrw",
-   "name": "원/100엔",
-   "group": "korea",
-   "source": "yahoo",
-   "code": "JPYKRW=X",
-   "freq": "daily",
-   "unit": "원",
-   "decimals": 2,
-   "change": "pct",
-   "scale": 100,
-   "news": "원엔 환율"
-  },
-  {
    "id": "spx",
    "name": "S&P 500",
    "group": "us",
@@ -341,6 +316,31 @@
    "news": "영국 FTSE"
   },
   {
+   "id": "usdkrw",
+   "name": "원/달러",
+   "group": "fx",
+   "source": "yahoo",
+   "code": "KRW=X",
+   "freq": "daily",
+   "unit": "원",
+   "decimals": 1,
+   "change": "pct",
+   "news": "원달러 환율"
+  },
+  {
+   "id": "jpykrw",
+   "name": "원/100엔",
+   "group": "fx",
+   "source": "yahoo",
+   "code": "JPYKRW=X",
+   "freq": "daily",
+   "unit": "원",
+   "decimals": 2,
+   "change": "pct",
+   "scale": 100,
+   "news": "원엔 환율"
+  },
+  {
    "id": "dxy",
    "name": "달러인덱스",
    "group": "fx",
@@ -415,6 +415,18 @@
     "label": "FOMC 점도표 중간값(연말)"
    },
    "news": "연준 기준금리"
+  },
+  {
+   "id": "krbase",
+   "name": "한국 기준금리",
+   "group": "rates",
+   "source": "bis",
+   "code": "D.KR",
+   "freq": "daily",
+   "unit": "%",
+   "decimals": 2,
+   "change": "bp",
+   "news": "한국은행 기준금리"
   },
   {
    "id": "ust3m",
@@ -507,10 +519,24 @@
    "source": "yahoo",
    "code": "TTF=F",
    "freq": "daily",
-   "unit": "€/MWh",
+   "unit": "$/MMBtu",
    "decimals": 2,
    "change": "pct",
-   "news": "유럽 천연가스 가격"
+   "news": "유럽 천연가스 가격",
+   "fx": "EURUSD=X",
+   "scale": 0.293083
+  },
+  {
+   "id": "jkm",
+   "name": "아시아 LNG(JKM)",
+   "group": "commodity",
+   "source": "yahoo",
+   "code": "JKM=F",
+   "freq": "daily",
+   "unit": "$/MMBtu",
+   "decimals": 2,
+   "change": "pct",
+   "news": "JKM LNG 가격"
   },
   {
    "id": "copper",

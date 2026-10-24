@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import collect  # noqa: E402
-from fakes import daily, fake_fred, fake_lme, fake_yahoo  # noqa: E402
+from fakes import BIS_CSV, daily, fake_bis, fake_fred, fake_lme, fake_yahoo  # noqa: E402
 
 REG = collect.load_registry()
 
@@ -22,13 +22,13 @@ def test_registry_is_consistent():
     assert len(ids) == len(set(ids))
     for i in REG["indicators"]:
         assert i["group"] in groups
-        assert i["source"] in ("fred", "yahoo", "lme")
+        assert i["source"] in ("fred", "yahoo", "lme", "bis")
         assert i["freq"] in collect.START
         assert i["change"] in ("pct", "bp", "pp", "abs")
 
 
 def test_collect_all_ok(tmp_path):
-    latest, series = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme, log=lambda *_: None)
+    latest, series = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme, fetch_bis=fake_bis, log=lambda *_: None)
     assert latest["counts"] == {"ok": len(REG["indicators"]), "stale": 0, "missing": 0}
     by_id = {i["id"]: i for i in latest["indicators"]}
     # 전년비 변환: 매월 0.2% 상승 → 연 2.43%
@@ -69,7 +69,7 @@ def test_failures_fall_back_to_previous():
         return prev if ind_id in ("kospi", "ust10y") else None
 
     latest, series = collect.collect(REG, previous_url="https://example", fetch_fred=broken_fred,
-                                     fetch_yahoo=flaky_yahoo, fetch_previous=previous, fetch_lme=fake_lme, log=lambda *_: None)
+                                     fetch_yahoo=flaky_yahoo, fetch_previous=previous, fetch_lme=fake_lme, fetch_bis=fake_bis, log=lambda *_: None)
     by_id = {i["id"]: i for i in latest["indicators"]}
     assert by_id["kospi"]["status"] == "stale" and by_id["kospi"]["error"] == "데이터 없음"
     assert by_id["ust10y"]["status"] == "stale" and "503" in by_id["ust10y"]["error"]
@@ -84,7 +84,7 @@ def test_main_fails_when_nothing_collected(monkeypatch, tmp_path):
     monkeypatch.setattr(collect, "fetch_fred", boom)
     monkeypatch.setattr(collect, "fetch_yahoo", boom)
     monkeypatch.setattr(collect, "collect", lambda reg, **kw: collect.__dict__["_orig_collect"](
-        reg, fetch_fred=boom, fetch_yahoo=boom, fetch_lme=boom, fetch_previous=lambda *a, **k: None, log=lambda *_: None))
+        reg, fetch_fred=boom, fetch_yahoo=boom, fetch_lme=boom, fetch_bis=boom, fetch_previous=lambda *a, **k: None, log=lambda *_: None))
     assert collect.main(["--out", str(tmp_path)]) == 1
     assert not (tmp_path / "latest.json").exists()
 
@@ -110,7 +110,7 @@ def test_only_repeated_failures_are_reported():
 
 
 def test_forecast_points_follow_last_actual():
-    latest, _ = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme,
+    latest, _ = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme, fetch_bis=fake_bis,
                                 log=lambda *_: None)
     by_id = {i["id"]: i for i in latest["indicators"]}
     ff = by_id["fedfunds"]["forecast"]
@@ -129,3 +129,20 @@ def test_parse_lme_html():
     s = collect.parse_lme_html(html)
     assert list(s.index.strftime("%Y-%m-%d")) == ["2025-12-31", "2026-10-22", "2026-10-23"]
     assert s.iloc[-1] == pytest.approx(13045.5)
+
+
+def test_parse_bis_csv_skips_blank_values():
+    s = collect.parse_bis_csv(BIS_CSV)
+    assert list(s.index.strftime("%Y-%m-%d")) == ["2026-10-21", "2026-10-22"]
+    assert s.iloc[-1] == 2.5
+
+
+def test_ttf_converted_to_usd_per_mmbtu():
+    ind = next(i for i in REG["indicators"] if i["id"] == "ttf")
+    idx = pd.to_datetime(["2026-10-20", "2026-10-21", "2026-10-22"])
+    eur_mwh = pd.Series([34.12, 34.12, 34.12], index=idx)
+    eurusd = pd.Series([1.10, 1.20], index=pd.to_datetime(["2026-10-20", "2026-10-22"]))
+    s = collect.transform(eur_mwh, ind, eurusd)
+    # 34.12 €/MWh × 1.10 $/€ ÷ 3.412 MMBtu/MWh = 11.0 $/MMBtu (빈 날은 직전 환율)
+    assert [round(v, 2) for v in s.values] == [11.0, 11.0, 12.0]
+    assert ind["unit"] == "$/MMBtu"

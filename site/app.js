@@ -191,12 +191,26 @@ async function renderBriefing() {
   document.getElementById('briefing-headline').textContent = brief.headline;
   const list = document.getElementById('briefing-list');
   list.replaceChildren();
-  for (const s of brief.sections) {
+  for (const s of brief.stories || []) {
     const li = document.createElement('li');
-    const b = document.createElement('b');
-    b.textContent = s.name;
-    li.append(b, ' ', s.text);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'linklike';
+    btn.textContent = s.text;
+    if (state.defs.has(s.id)) btn.addEventListener('click', () => openDetail(s.id));
+    li.appendChild(btn);
+    if (s.headlines?.length) li.appendChild(headlineList(s, { links: true }));
     list.appendChild(li);
+  }
+  if (!list.children.length) {
+    const li = document.createElement('li');
+    li.textContent = '평소 범위를 벗어난 움직임이 없었습니다.';
+    list.appendChild(li);
+  }
+  for (const [key, rows] of [['reads', brief.reads], ['signals', brief.signals]]) {
+    const ul = document.getElementById(`briefing-${key}`);
+    ul.replaceChildren(...(rows || []).map(t => Object.assign(document.createElement('li'), { textContent: t })));
+    ul.parentElement.hidden = !ul.children.length;
   }
   document.getElementById('briefing-block').hidden = false;
 }

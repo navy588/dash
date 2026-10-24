@@ -58,7 +58,6 @@ jobs:
           PREVIOUS_DATA_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
         run: |
           python pipeline/collect.py --out site/data
-          python pipeline/briefing.py site/data
           python pipeline/health.py "$PREVIOUS_DATA_URL" >> "$GITHUB_OUTPUT"
 
       - name: Attach news headlines
@@ -68,6 +67,10 @@ jobs:
           PREVIOUS_DATA_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
           NEWS_MAX_QUERIES: ${{ github.event_name == 'pull_request' && '60' || '400' }}
         run: python pipeline/news.py site/data
+
+      - name: Write briefing
+        continue-on-error: true   # 브리핑이 실패해도 지표 배포는 계속
+        run: python pipeline/briefing.py site/data
 
       - name: Render check with collected data (PR)
         if: github.event_name == 'pull_request'

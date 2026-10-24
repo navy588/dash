@@ -58,6 +58,11 @@ def google_news(query, date, session):
     return parse_rss(r.text)
 
 
+def clean_title(title):
+    """'제목 | 매체'에서 매체가 잘린 뒤 남는 꼬리 기호를 지웁니다."""
+    return title.rstrip(" |·-").strip()
+
+
 def parse_rss(text, limit=HEADLINES):
     root = ET.fromstring(text)
     out = []
@@ -66,6 +71,7 @@ def parse_rss(text, limit=HEADLINES):
         source = (item.findtext("source") or "").strip()
         if source and title.endswith(f" - {source}"):
             title = title[: -len(source) - 3].strip()
+        title = clean_title(title)
         published = item.findtext("pubDate")
         try:
             published = parsedate_to_datetime(published).strftime("%Y-%m-%d") if published else None
@@ -117,7 +123,7 @@ def build_notes(registry, data_dir, previous_url=None, search=google_news,
             key = d.strftime("%Y-%m-%d")
             ev = {"date": key, "change": None if ch is None else round(ch, 4), "sigma": sg, "headlines": []}
             if prev.get(key, {}).get("headlines"):
-                ev["headlines"] = prev[key]["headlines"]
+                ev["headlines"] = [{**h, "title": clean_title(h.get("title", ""))} for h in prev[key]["headlines"]]
                 stats["cached"] += 1
             else:
                 queue.append((d, ind, ev))
@@ -141,11 +147,12 @@ def build_notes(registry, data_dir, previous_url=None, search=google_news,
 
     for ind_id, (ind, evs) in notes.items():
         stats["events"] += len(evs)
+        stats["with_headlines"] = stats.get("with_headlines", 0) + sum(bool(e["headlines"]) for e in evs)
         with open(out_dir / f"{ind_id}.json", "w", encoding="utf-8") as f:
             json.dump({"id": ind_id, "query": ind.get("news", ind["name"]), "events": evs},
                       f, ensure_ascii=False, separators=(",", ":"))
     log(f"뉴스: 시점 {stats['events']}개 · 새로 검색 {stats['searched']} · 재사용 {stats['cached']} · "
-        f"실패 {stats['failed']} · 다음 실행으로 미룸 {stats['pending']}")
+        f"실패 {stats['failed']} · 다음 실행으로 미룸 {stats['pending']} · 헤드라인 있는 시점 {stats.get('with_headlines', 0)}")
     return stats
 
 

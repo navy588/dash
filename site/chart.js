@@ -8,7 +8,17 @@ function el(name, attrs = {}, parent) {
   return node;
 }
 
-export function sparkline(values, { width = 84, height = 28, color = 'var(--spark)', dotColor = color } = {}) {
+let gradSeq = 0;
+function gradient(svg, color, opacity = 0.22) {
+  const id = `g${++gradSeq}`;
+  const defs = el('defs', {}, svg);
+  const g = el('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+  el('stop', { offset: '0%', style: `stop-color:${color};stop-opacity:${opacity}` }, g);
+  el('stop', { offset: '100%', style: `stop-color:${color};stop-opacity:0` }, g);
+  return `url(#${id})`;
+}
+
+export function sparkline(values, { width = 84, height = 28, color = 'var(--spark)', dotColor = color, area = false } = {}) {
   const svg = el('svg', { viewBox: `0 0 ${width} ${height}`, class: 'spark', 'aria-hidden': 'true', preserveAspectRatio: 'none' });
   if (!values || values.length < 2) return svg;
   const min = Math.min(...values), max = Math.max(...values);
@@ -18,13 +28,19 @@ export function sparkline(values, { width = 84, height = 28, color = 'var(--spar
     (i / (values.length - 1)) * width,
     pad + (1 - (v - min) / span) * (height - pad * 2),
   ]);
+  const line = pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
+  if (area) {
+    el('polygon', { points: `0,${height} ${line} ${width},${height}`, fill: gradient(svg, color), stroke: 'none' }, svg);
+  }
   el('polyline', {
-    points: pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' '),
-    fill: 'none', stroke: color, 'stroke-width': 1.25, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+    points: line,
+    fill: 'none', stroke: color, 'stroke-width': area ? 1.75 : 1.25, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
     'vector-effect': 'non-scaling-stroke',
   }, svg);
-  const [lx, ly] = pts[pts.length - 1];
-  el('circle', { cx: lx, cy: ly, r: 2.5, fill: dotColor }, svg);
+  if (!area) {
+    const [lx, ly] = pts[pts.length - 1];
+    el('circle', { cx: lx, cy: ly, r: 2.5, fill: dotColor }, svg);
+  }
   return svg;
 }
 
@@ -43,7 +59,7 @@ function niceTicks(min, max, count = 5) {
 /**
  * series: [{ name, color, values: number[] }] — 모두 같은 길이, x 위치는 xs 공유
  * xs: number[] (시간이면 ms, 범주면 0..n-1)
- * series[].dashed: 점선(전망치 등)
+ * series[].dashed: 점선(전망치 등), series[].area: 아래를 옅은 그라데이션으로 채움
  * events: { [index]: { color, mark, render(tipElement) } } — 툴팁에 내용을 덧붙이고, mark면 점도 찍음
  * opts: { formatX(x, i), formatY(v), xTicks(xs) => [{x, label}], zeroLine }
  */
@@ -95,6 +111,10 @@ export function lineChart(container, { xs, series, formatX, formatY, xTicks, zer
       d += `${pen ? 'L' : 'M'}${px.toFixed(1)},${Y(v).toFixed(1)}`;
       pen = true;
     });
+    if (s.area && d) {
+      const firstX = d.match(/^M([\d.-]+)/)[1], lastX = d.match(/([\d.-]+),[\d.-]+$/)[1];
+      el('path', { d: `${d}L${lastX},${H - m.b}L${firstX},${H - m.b}Z`, fill: gradient(svg, s.color, 0.18), stroke: 'none' }, svg);
+    }
     el('path', { d, fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
       ...(s.dashed ? { 'stroke-dasharray': '5 4' } : {}) }, svg);
     if (s.markers) {

@@ -5,7 +5,7 @@ const FREQ_PREV = { daily: '전일', weekly: '전주', monthly: '전월', quarte
 const STALE_DAYS = { daily: 5, weekly: 12, monthly: 75, quarterly: 200 };
 const SIGMA_THRESHOLD = 2;
 
-const state = { defs: new Map(), items: new Map(), groups: [], seriesCache: new Map(), detail: null, range: '1y' };
+const state = { period: 'prev', tab: null, defs: new Map(), items: new Map(), groups: [], seriesCache: new Map(), detail: null, range: '1y' };
 
 // ── 테마 ───────────────────────────────────────────────
 (function initTheme() {
@@ -70,10 +70,10 @@ function isOutdated(def, item) {
   return age > STALE_DAYS[def.freq];
 }
 
-// ── 표 ───────────────────────────────────────────────
-const KEY_IDS = ['kospi', 'usdkrw', 'spx', 'nasdaq', 'ust10y', 'dxy', 'wti', 'gold', 'bitcoin'];
-const COLS = [['prev', '직전'], ['w1', '1주'], ['m1', '1개월'], ['ytd', '연초']];
-// 발표 주기보다 짧은 기간은 직전 대비와 같은 값이라 비워 둠
+// ── 공통 조각 ─────────────────────────────────────────
+const KEY_IDS = ['kospi', 'usdkrw', 'spx', 'nasdaq', 'ust10y', 'wti', 'gold', 'bitcoin'];
+const PERIOD_LABEL = { prev: '직전', w1: '1주', m1: '1개월', ytd: '연초', y1: '1년' };
+// 발표 주기보다 짧은 기간은 직전 대비와 같은 값이라 표시하지 않음
 const SKIP = { daily: [], weekly: ['w1'], monthly: ['w1', 'm1'], quarterly: ['w1', 'm1'] };
 
 function el(tag, cls, text) {
@@ -83,132 +83,142 @@ function el(tag, cls, text) {
   return n;
 }
 
-function chg(def, c) {
+function pill(def, c) {
   const dir = direction(c);
-  return el('span', `chg ${dir.cls}`, c ? fmtChange(def, c).replace(/^[+−]/, '') : '–');
+  return el('span', `pill ${dir.cls}`, c ? fmtChange(def, c) : '–');
 }
 
-function valueNode(def, v) {
-  const span = el('span', 'val');
+function valueNode(def, v, cls = 'val') {
+  const span = el('span', cls);
   span.append((def.unit === '$' ? '$' : '') + fmtValue(def, v));
   if (def.unit && def.unit !== 'pt' && def.unit !== '$') span.appendChild(el('small', null, def.unit));
   return span;
 }
 
-function spark(item) {
-  const dir = direction(item.changes.prev);
-  return sparkline(item.spark, { color: 'var(--spark)', dotColor: `var(--${dir.cls})` });
+// 추세선 색은 그 선이 보여 주는 기간(최근 몇 달)의 방향
+function trendCls(item) {
+  const s = item.spark || [];
+  if (s.length < 2 || s[s.length - 1] === s[0]) return 'flat';
+  return s[s.length - 1] > s[0] ? 'up' : 'down';
 }
 
-function statusBadge(def, item) {
-  if (item.status !== 'ok') return Object.assign(el('span', 'badge warn', '이전 데이터'), { title: item.error || '' });
-  if (isOutdated(def, item)) return Object.assign(el('span', 'badge warn', '갱신 지연'), { title: '최근 데이터가 들어오지 않았습니다' });
-  return null;
+function spark(item, opts = {}) {
+  return sparkline(item.spark, { color: `var(--${trendCls(item)})`, ...opts });
 }
 
-function sigmaBadge(def, item) {
-  if (item.sigma == null || Math.abs(item.sigma) < SIGMA_THRESHOLD || (def.freq !== 'daily' && def.freq !== 'weekly')) return null;
-  const dir = direction(item.changes.prev);
-  return Object.assign(el('span', `badge sigma ${dir.cls}`, `평소 ${fmtNum(Math.abs(item.sigma), 1)}배`),
-    { title: '직전 대비 변화가 최근 1년 평균 변동폭의 몇 배인지' });
+function badges(def, item) {
+  const out = [];
+  if (item.sigma != null && Math.abs(item.sigma) >= SIGMA_THRESHOLD && (def.freq === 'daily' || def.freq === 'weekly')) {
+    out.push(Object.assign(el('span', `badge hot ${direction(item.changes.prev).cls}`, `평소 ${fmtNum(Math.abs(item.sigma), 1)}배`),
+      { title: '직전 대비 변화가 최근 1년 평균 변동폭의 몇 배인지' }));
+  }
+  if (item.status !== 'ok') out.push(Object.assign(el('span', 'badge warn', '이전 데이터'), { title: item.error || '' }));
+  else if (isOutdated(def, item)) out.push(el('span', 'badge warn', '갱신 지연'));
+  return out;
 }
 
-function row(def, item) {
-  const tr = el('tr');
-  tr.dataset.id = def.id;
-  tr.tabIndex = 0;
-  const dir = direction(item.changes.prev);
-  tr.setAttribute('aria-label', `${def.name} ${withUnit(def, item.last.value)}, ${FREQ_PREV[def.freq]} 대비 ${item.changes.prev ? fmtChange(def, item.changes.prev) + ' ' + dir.word : '변화 없음'}, ${fmtDate(def, item.last.date)} 기준. 자세히 보기`);
-
-  const name = el('th', 'c-name');
-  name.scope = 'row';
-  const line = el('div', 'nm');
-  line.appendChild(el('span', 'nm-text', def.name));
-  for (const b of [sigmaBadge(def, item), statusBadge(def, item)]) if (b) line.appendChild(b);
-  name.appendChild(line);
+function subText(def, item) {
   const subs = [];
-  if (def.freq !== 'daily') subs.push(fmtDate(def, item.last.date).replace(/^\d{4}년 /, '').replace(/^(\d{4})\.(\d{2})\.(\d{2})$/, (_, y, m, d) => `${+m}/${+d}`));
+  if (def.freq !== 'daily') subs.push(`${fmtDate(def, item.last.date)} 발표`);
   if (item.forecast?.points?.length) {
     const p = item.forecast.points[0];
     subs.push(`전망 ${fmtForecastDate(def, p.date)} ${withUnit(def, p.value)}`);
   }
-  if (subs.length) {
-    const sub = el('div', 'sub', subs.join(' · '));
-    if (item.forecast) sub.title = item.forecast.label;
-    name.appendChild(sub);
-  }
-  tr.appendChild(name);
-
-  const v = el('td', 'c-val');
-  v.appendChild(valueNode(def, item.last.value));
-  tr.appendChild(v);
-  for (const [k] of COLS) {
-    const td = el('td', `c-${k}`);
-    td.appendChild(SKIP[def.freq].includes(k) ? el('span', 'na', '') : chg(def, item.changes[k]));
-    tr.appendChild(td);
-  }
-  const sp = el('td', 'c-spark');
-  sp.appendChild(spark(item));
-  tr.appendChild(sp);
-
-  const open = () => openDetail(def.id);
-  tr.addEventListener('click', e => { if (!e.target.closest('a')) open(); });
-  tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
-  return tr;
+  return subs.join(' · ');
 }
 
-function renderGroups() {
-  const root = document.getElementById('groups');
-  const jump = document.getElementById('jump');
-  root.replaceChildren();
-  jump.replaceChildren();
-  for (const g of state.groups) {
-    const defs = [...state.defs.values()].filter(d => d.group === g.id && state.items.get(d.id)?.last);
-    if (!defs.length) continue;
-    const sec = el('section', 'panel board');
-    sec.id = `g-${g.id}`;
-    sec.setAttribute('aria-labelledby', `g-${g.id}-title`);
-    const head = el('div', 'panel-head');
-    const h = el('h2', null, g.name);
-    h.id = `g-${g.id}-title`;
-    head.appendChild(h);
-    const dailyDates = defs.filter(d => d.freq === 'daily').map(d => state.items.get(d.id).last.date).sort();
-    if (dailyDates.length) head.appendChild(el('span', 'meta', `${fmtDate({ freq: 'daily' }, dailyDates[dailyDates.length - 1])} 기준`));
-    sec.appendChild(head);
-
-    const table = el('table', 'mtable');
-    const tr = table.createTHead().insertRow();
-    for (const [cls, label] of [['c-name', '지표'], ['c-val', '현재'], ...COLS.map(([k, l]) => [`c-${k}`, l]), ['c-spark', '추세']]) {
-      const th = el('th', cls, label);
-      th.scope = 'col';
-      tr.appendChild(th);
-    }
-    const body = table.createTBody();
-    for (const d of defs) body.appendChild(row(d, state.items.get(d.id)));
-    sec.appendChild(table);
-    root.appendChild(sec);
-
-    const a = el('a', null, g.name);
-    a.href = `#g-${g.id}`;
-    jump.appendChild(a);
-  }
+function ariaFor(def, item, period = 'prev') {
+  const c = item.changes[period];
+  const label = period === 'prev' ? `${FREQ_PREV[def.freq]} 대비` : `${PERIOD_LABEL[period]} 대비`;
+  return `${def.name} ${withUnit(def, item.last.value)}, ${label} ${c ? fmtChange(def, c) : '변화 없음'}, ${fmtDate(def, item.last.date)} 기준. 자세히 보기`;
 }
 
+// ── 주요 지표 카드 ─────────────────────────────────────
 function renderKeys() {
   const box = document.getElementById('keys');
   box.replaceChildren();
   for (const id of KEY_IDS) {
     const def = state.defs.get(id), item = state.items.get(id);
     if (!def || !item) continue;
-    const b = el('button', 'keyrow');
+    const b = el('button', 'card keycard');
     b.type = 'button';
     b.dataset.id = id;
-    b.append(el('span', 'k-name', def.name), valueNode(def, item.last.value), chg(def, item.changes.prev), spark(item));
+    b.setAttribute('aria-label', ariaFor(def, item));
+    const top = el('div', 'kc-top');
+    top.append(el('span', 'kc-name', def.name), pill(def, item.changes.prev));
+    b.append(top, valueNode(def, item.last.value, 'kc-val'), spark(item, { width: 160, height: 40, area: true }));
     b.addEventListener('click', () => openDetail(id));
     box.appendChild(b);
   }
 }
 
+// ── 분야별 시세 ─────────────────────────────────────────
+function listRow(def, item) {
+  const b = el('button', 'lrow');
+  b.type = 'button';
+  b.dataset.id = def.id;
+  b.setAttribute('aria-label', ariaFor(def, item, SKIP[def.freq].includes(state.period) ? 'prev' : state.period));
+
+  const left = el('span', 'lr-left');
+  const nm = el('span', 'lr-name');
+  nm.append(el('span', 'nm-text', def.name), ...badges(def, item));
+  left.appendChild(nm);
+  const sub = subText(def, item);
+  if (sub) left.appendChild(el('span', 'lr-sub', sub));
+
+  const right = el('span', 'lr-right');
+  right.appendChild(valueNode(def, item.last.value, 'lr-val'));
+  const period = SKIP[def.freq].includes(state.period) ? null : state.period;
+  const p = period ? pill(def, item.changes[period]) : el('span', 'pill na', '–');
+  if (period === 'prev' || !period) p.title = `${FREQ_PREV[def.freq]} 대비`;
+  right.appendChild(p);
+
+  b.append(left, spark(item, { width: 72, height: 28 }), right);
+  b.addEventListener('click', () => openDetail(def.id));
+  return b;
+}
+
+function renderTabs() {
+  const tabs = document.getElementById('tabs');
+  tabs.replaceChildren();
+  for (const g of state.groups) {
+    if (![...state.defs.values()].some(d => d.group === g.id && state.items.get(d.id)?.last)) continue;
+    const t = el('button', 'tab', g.name);
+    t.type = 'button';
+    t.setAttribute('role', 'tab');
+    t.dataset.group = g.id;
+    t.setAttribute('aria-selected', String(g.id === state.tab));
+    t.addEventListener('click', () => {
+      state.tab = g.id;
+      try { localStorage.setItem('tab', g.id); } catch {}
+      for (const x of tabs.children) x.setAttribute('aria-selected', String(x === t));
+      renderGroups();
+    });
+    tabs.appendChild(t);
+  }
+}
+
+function renderGroups() {
+  const root = document.getElementById('groups');
+  root.replaceChildren();
+  const defs = [...state.defs.values()].filter(d => d.group === state.tab && state.items.get(d.id)?.last);
+  for (const d of defs) root.appendChild(listRow(d, state.items.get(d.id)));
+  const dates = defs.filter(d => d.freq === 'daily').map(d => state.items.get(d.id).last.date).sort();
+  const foot = el('p', 'list-foot');
+  foot.textContent = (dates.length ? `${fmtDate({ freq: 'daily' }, dates[dates.length - 1])} 기준 · ` : '') +
+    `변화는 ${state.period === 'prev' ? '직전 발표(전일·전주·전월) 대비' : PERIOD_LABEL[state.period] + ' 대비'} · 추세선은 최근 3개월`;
+  root.appendChild(foot);
+}
+
+document.getElementById('period').addEventListener('click', e => {
+  const b = e.target.closest('button[data-period]');
+  if (!b) return;
+  state.period = b.dataset.period;
+  for (const x of document.querySelectorAll('#period button')) x.setAttribute('aria-checked', String(x === b));
+  renderGroups();
+});
+
+// ── 오늘의 브리핑 ───────────────────────────────────────
 // 브리핑은 없어도 화면이 동작하도록 실패를 무시합니다 (pipeline/briefing.py 가 생성)
 async function renderBriefing() {
   let brief;
@@ -217,10 +227,18 @@ async function renderBriefing() {
     if (!r.ok) return;
     brief = await r.json();
   } catch { return; }
-  document.getElementById('briefing-asof').textContent = `${fmtDate({ freq: 'daily' }, brief.as_of)} 마감 기준`;
+  const d = parseDate(brief.as_of);
+  document.getElementById('briefing-asof').textContent = `오늘의 시장 · ${d.getMonth() + 1}월 ${d.getDate()}일 마감`;
   const mood = document.getElementById('briefing-mood');
-  if (brief.mood && brief.mood !== '혼조') { mood.textContent = brief.mood; mood.hidden = false; }
+  if (brief.mood && brief.mood !== '혼조') {
+    mood.textContent = brief.mood;
+    mood.className = `mood ${brief.mood === '위험회피' ? 'off' : 'on'}`;
+    mood.hidden = false;
+  }
   document.getElementById('briefing-headline').textContent = brief.headline.replace(/^(위험회피|위험선호) · /, '');
+
+  const reads = document.getElementById('briefing-reads');
+  reads.replaceChildren(...(brief.reads || []).map(t => el('li', null, t)));
 
   const list = document.getElementById('briefing-list');
   list.replaceChildren();
@@ -228,16 +246,26 @@ async function renderBriefing() {
     const def = state.defs.get(s.id), item = state.items.get(s.id);
     if (!def || !item) continue;
     const li = el('li', 'story');
-    const top = el('button', 'story-top');
-    top.type = 'button';
-    top.addEventListener('click', () => openDetail(s.id));
-    top.append(el('span', 'nm-text', def.name), valueNode(def, item.last.value), chg(def, item.changes.prev));
-    if (s.big && item.sigma != null) top.appendChild(el('span', `badge sigma ${direction(item.changes.prev).cls}`, `평소 ${fmtNum(Math.abs(item.sigma), 1)}배`));
-    for (const c of s.text.split(' · ').slice(1).join(', ').split(', ').filter(Boolean)) top.appendChild(el('span', 'badge', c));
-    li.appendChild(top);
+    const btn = el('button', 'story-main');
+    btn.type = 'button';
+    btn.setAttribute('aria-label', ariaFor(def, item));
+    btn.addEventListener('click', () => openDetail(s.id));
+    const top = el('span', 'st-top');
+    top.append(el('span', 'st-name', def.name), ...badges(def, item).filter(x => x.classList.contains('hot')));
+    const mid = el('span', 'st-mid');
+    mid.append(valueNode(def, item.last.value, 'st-val'), pill(def, item.changes.prev));
+    btn.append(top, mid, spark(item, { width: 240, height: 44, area: true }));
+    li.appendChild(btn);
+    const ctx = s.text.split(' · ').slice(1).join(', ').split(', ').filter(Boolean);
+    if (ctx.length) {
+      const chips = el('div', 'chips');
+      for (const c of ctx) chips.appendChild(el('span', 'chip', c));
+      li.appendChild(chips);
+    }
     const h = s.headlines?.[0];
     if (h) {
       const p = el('p', 'why');
+      p.appendChild(el('span', 'why-label', '왜?'));
       if (/^https?:\/\//.test(h.url)) {
         const a = el('a', null, h.title);
         a.href = h.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
@@ -248,14 +276,11 @@ async function renderBriefing() {
     }
     list.appendChild(li);
   }
-  if (!list.children.length) list.appendChild(el('li', 'story quiet', '평소 범위를 벗어난 움직임이 없었습니다.'));
+  list.hidden = !list.children.length;
 
-  for (const [key, rows] of [['reads', brief.reads], ['signals', brief.signals]]) {
-    const ul = document.getElementById(`briefing-${key}`);
-    ul.replaceChildren(...(rows || []).map(t => el('li', null, t)));
-    ul.closest('.reads-wrap, .signals-wrap').hidden = !ul.children.length;
-  }
-  document.getElementById('briefing-signal-count').textContent = (brief.signals || []).length ? `${brief.signals.length}` : '';
+  const sig = document.getElementById('briefing-signals');
+  sig.replaceChildren(...(brief.signals || []).map(t => el('li', null, t)));
+  sig.closest('section').hidden = !sig.children.length;
   document.getElementById('briefing-block').hidden = false;
 }
 
@@ -343,8 +368,10 @@ async function openDetail(id) {
   document.getElementById('detail-title').textContent = def.name;
   const c = item.changes.prev;
   const dir = direction(c);
+  const val = document.getElementById('detail-value');
+  val.replaceChildren(valueNode(def, item.last.value, 'dv-val'), pill(def, c));
   document.getElementById('detail-sub').textContent =
-    `${withUnit(def, item.last.value)} · ${FREQ_PREV[def.freq]} 대비 ${c ? dir.arrow + ' ' + fmtChange(def, c) : '–'} · ${fmtDate(def, item.last.date)} 기준`;
+    `${FREQ_PREV[def.freq]} 대비 ${c ? dir.word : '–'} · ${fmtDate(def, item.last.date)} 기준${item.forecast?.points?.length ? ' · ' + subText(def, item).split(' · ').pop() : ''}`;
   if (!dlg.open) dlg.showModal();
   if (def.freq !== 'daily' && def.freq !== 'weekly' && state.range === '3m') setRange('1y');
   const chartBox = document.getElementById('detail-chart');
@@ -369,7 +396,8 @@ function drawDetail(def, s) {
   const nActual = xs.length;
 
   // 전망치: 마지막 실제값에서 이어지는 점선
-  const series = [{ name: def.name, color: cssVar('--ink-2'), values: vals.slice() }];
+  const trend = vals.length > 1 ? (vals[vals.length - 1] >= vals[0] ? 'up' : 'down') : 'flat';
+  const series = [{ name: def.name, color: cssVar(`--${trend}`), values: vals.slice(), area: true }];
   const fc = item?.forecast?.points || [];
   if (fc.length) {
     const fvals = new Array(nActual).fill(null);
@@ -378,7 +406,7 @@ function drawDetail(def, s) {
       xs.push(parseDate(p.date).getTime()); dates.push(p.date);
       series[0].values.push(null); fvals.push(p.value);
     }
-    series.push({ name: `전망 (${item.forecast.label})`, color: cssVar('--series-1'), values: fvals, dashed: true, markers: true });
+    series.push({ name: `전망 (${item.forecast.label})`, color: cssVar('--ink-3'), values: fvals, dashed: true, markers: true });
   }
 
   // 큰 움직임과 관련 뉴스
@@ -418,7 +446,7 @@ function drawDetail(def, s) {
   const legend = document.getElementById('detail-legend');
   legend.replaceChildren();
   if (fc.length) {
-    for (const [label, color, dashed] of [['실제', cssVar('--ink-2'), false], [`전망 · ${item.forecast.label}`, cssVar('--series-1'), true]]) {
+    for (const [label, color, dashed] of [['실제', series[0].color, false], [`전망 · ${item.forecast.label}`, cssVar('--ink-3'), true]]) {
       const span = document.createElement('span');
       const i = document.createElement('i');
       i.style.background = dashed ? `repeating-linear-gradient(90deg, ${color} 0 5px, transparent 5px 9px)` : color;
@@ -513,7 +541,7 @@ async function main() {
   const t = new Date(latest.generated_at);
   const kst = { timeZone: 'Asia/Seoul' };
   document.getElementById('updated').textContent =
-    `마지막 업데이트 ${t.toLocaleString('ko-KR', { ...kst, year: 'numeric', month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} (한국시간) · 다음 업데이트 ${nextUpdate(t)}`;
+    `마지막 업데이트 ${t.toLocaleString('ko-KR', { ...kst, month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} · 다음 ${nextUpdate(t)}`;
 
   const notice = document.getElementById('notice');
   const ageH = (Date.now() - t) / 36e5;
@@ -523,6 +551,10 @@ async function main() {
   if (stale || missing) msgs.push(`${stale + missing}개 지표는 이번에 새로 받지 못해 이전 데이터로 표시합니다.`);
   if (msgs.length) { notice.textContent = msgs.join(' '); notice.hidden = false; }
 
+  let saved = null;
+  try { saved = localStorage.getItem('tab'); } catch {}
+  state.tab = state.groups.some(g => g.id === saved) ? saved : state.groups[0]?.id;
+  renderTabs();
   renderGroups();
   renderKeys();
   renderBriefing();

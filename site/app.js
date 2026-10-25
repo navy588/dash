@@ -1,12 +1,11 @@
 import { sparkline, lineChart, timeTicks } from './chart.js';
 
 const DATA = 'data';
-const PERIOD_LABEL = { prev: '직전 대비', w1: '1주', m1: '1개월', ytd: '연초 대비', y1: '1년' };
 const FREQ_PREV = { daily: '전일', weekly: '전주', monthly: '전월', quarterly: '전분기' };
 const STALE_DAYS = { daily: 5, weekly: 12, monthly: 75, quarterly: 200 };
 const SIGMA_THRESHOLD = 2;
 
-const state = { period: 'prev', defs: new Map(), items: new Map(), groups: [], seriesCache: new Map(), detail: null, range: '1y' };
+const state = { defs: new Map(), items: new Map(), groups: [], seriesCache: new Map(), detail: null, range: '1y' };
 
 // ── 테마 ───────────────────────────────────────────────
 (function initTheme() {
@@ -60,28 +59,10 @@ function fmtDate(def, s) {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function periodShort(def, period) {
-  return period === 'prev' ? FREQ_PREV[def.freq] : PERIOD_LABEL[period].replace(' 대비', '');
-}
-
-function deltaSpan(def, c, label) {
-  const span = document.createElement('span');
-  const dir = direction(c);
-  span.className = `chg ${dir.cls}`;
-  const l = document.createElement('small');
-  l.textContent = label;
-  span.append(l, c ? ` ${dir.arrow} ${fmtChange(def, c)}` : ' –');
-  return span;
-}
-
 function fmtForecastDate(def, s) {
   const d = parseDate(s);
   if (def.freq === 'quarterly') return `${String(d.getFullYear()).slice(2)}년 ${Math.floor(d.getMonth() / 3) + 1}분기`;
   return `${String(d.getFullYear()).slice(2)}년 말`;
-}
-
-function periodLabel(def, period) {
-  return period === 'prev' ? FREQ_PREV[def.freq] + ' 대비' : PERIOD_LABEL[period];
 }
 
 function isOutdated(def, item) {
@@ -89,95 +70,143 @@ function isOutdated(def, item) {
   return age > STALE_DAYS[def.freq];
 }
 
-// ── 카드 ───────────────────────────────────────────────
-function tile(def, item, { showSigma = false } = {}) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'card tile';
-  b.dataset.id = def.id;
+// ── 표 ───────────────────────────────────────────────
+const KEY_IDS = ['kospi', 'usdkrw', 'spx', 'nasdaq', 'ust10y', 'dxy', 'wti', 'gold', 'bitcoin'];
+const COLS = [['prev', '직전'], ['w1', '1주'], ['m1', '1개월'], ['ytd', '연초']];
+// 발표 주기보다 짧은 기간은 직전 대비와 같은 값이라 비워 둠
+const SKIP = { daily: [], weekly: ['w1'], monthly: ['w1', 'm1'], quarterly: ['w1', 'm1'] };
 
-  const name = document.createElement('div');
-  name.className = 'name';
-  const nm = document.createElement('span');
-  nm.textContent = def.name;
-  name.appendChild(nm);
-  if (item.status !== 'ok' || isOutdated(def, item)) {
-    const badge = document.createElement('span');
-    badge.className = 'badge';
-    badge.textContent = item.status === 'ok' ? '갱신 지연' : '이전 데이터';
-    badge.title = item.error || '최근 데이터가 들어오지 않았습니다';
-    name.appendChild(badge);
-  }
-  if (showSigma && item.sigma != null) {
-    const badge = document.createElement('span');
-    badge.className = 'badge sigma';
-    badge.textContent = `평소의 ${fmtNum(Math.abs(item.sigma), 1)}배`;
-    name.appendChild(badge);
-  }
-  b.appendChild(name);
-
-  const value = document.createElement('div');
-  value.className = 'value';
-  if (def.unit === '$') value.append('$');
-  value.append(fmtValue(def, item.last.value));
-  if (def.unit && def.unit !== 'pt' && def.unit !== '$') {
-    const u = document.createElement('small');
-    u.textContent = def.unit;
-    value.appendChild(u);
-  }
-  b.appendChild(value);
-
-  const period = showSigma ? 'prev' : state.period;
-  const c = item.changes[period];
-  const dir = direction(c);
-  b.appendChild(sparkline(item.spark, { color: `var(--${dir.cls})` }));
-
-  const delta = document.createElement('div');
-  delta.className = 'delta';
-  delta.appendChild(deltaSpan(def, c, periodShort(def, period)));
-  // 일별 지표는 주간 변화도 함께
-  if (period === 'prev' && def.freq === 'daily' && item.changes.w1) {
-    delta.append(' ');
-    delta.appendChild(deltaSpan(def, item.changes.w1, '1주'));
-  }
-  b.appendChild(delta);
-
-  if (item.forecast?.points?.length) {
-    const fc = document.createElement('div');
-    fc.className = 'fc';
-    const p = item.forecast.points[0];
-    fc.textContent = `전망 ${fmtForecastDate(def, p.date)} ${withUnit(def, p.value)}`;
-    fc.title = item.forecast.label;
-    b.appendChild(fc);
-  }
-
-  const date = document.createElement('div');
-  date.className = 'date';
-  date.textContent = `${fmtDate(def, item.last.date)} 기준`;
-  b.appendChild(date);
-
-  b.setAttribute('aria-label', `${def.name} ${withUnit(def, item.last.value)}, ${periodLabel(def, period)} ${c ? fmtChange(def, c) + ' ' + dir.word : '변화 없음'}, ${fmtDate(def, item.last.date)} 기준. 자세히 보기`);
-  b.addEventListener('click', () => openDetail(def.id));
-  return b;
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
 }
 
-function renderMovers() {
-  const box = document.getElementById('movers');
-  box.replaceChildren();
-  const movers = [...state.items.values()]
-    .filter(it => it.status === 'ok' && it.sigma != null && Math.abs(it.sigma) >= SIGMA_THRESHOLD)
-    .filter(it => !isOutdated(state.defs.get(it.id), it))
-    .filter(it => { const f = state.defs.get(it.id).freq; return f === 'daily' || f === 'weekly'; })
-    .sort((a, b) => Math.abs(b.sigma) - Math.abs(a.sigma))
-    .slice(0, 8);
-  if (!movers.length) {
-    const p = document.createElement('p');
-    p.className = 'empty card';
-    p.textContent = '평소보다 크게 움직인 지표가 없습니다.';
-    box.appendChild(p);
-    return;
+function chg(def, c) {
+  const dir = direction(c);
+  return el('span', `chg ${dir.cls}`, c ? fmtChange(def, c).replace(/^[+−]/, '') : '–');
+}
+
+function valueNode(def, v) {
+  const span = el('span', 'val');
+  span.append((def.unit === '$' ? '$' : '') + fmtValue(def, v));
+  if (def.unit && def.unit !== 'pt' && def.unit !== '$') span.appendChild(el('small', null, def.unit));
+  return span;
+}
+
+function spark(item) {
+  const dir = direction(item.changes.prev);
+  return sparkline(item.spark, { color: 'var(--spark)', dotColor: `var(--${dir.cls})` });
+}
+
+function statusBadge(def, item) {
+  if (item.status !== 'ok') return Object.assign(el('span', 'badge warn', '이전 데이터'), { title: item.error || '' });
+  if (isOutdated(def, item)) return Object.assign(el('span', 'badge warn', '갱신 지연'), { title: '최근 데이터가 들어오지 않았습니다' });
+  return null;
+}
+
+function sigmaBadge(def, item) {
+  if (item.sigma == null || Math.abs(item.sigma) < SIGMA_THRESHOLD || (def.freq !== 'daily' && def.freq !== 'weekly')) return null;
+  const dir = direction(item.changes.prev);
+  return Object.assign(el('span', `badge sigma ${dir.cls}`, `평소 ${fmtNum(Math.abs(item.sigma), 1)}배`),
+    { title: '직전 대비 변화가 최근 1년 평균 변동폭의 몇 배인지' });
+}
+
+function row(def, item) {
+  const tr = el('tr');
+  tr.dataset.id = def.id;
+  tr.tabIndex = 0;
+  const dir = direction(item.changes.prev);
+  tr.setAttribute('aria-label', `${def.name} ${withUnit(def, item.last.value)}, ${FREQ_PREV[def.freq]} 대비 ${item.changes.prev ? fmtChange(def, item.changes.prev) + ' ' + dir.word : '변화 없음'}, ${fmtDate(def, item.last.date)} 기준. 자세히 보기`);
+
+  const name = el('th', 'c-name');
+  name.scope = 'row';
+  const line = el('div', 'nm');
+  line.appendChild(el('span', 'nm-text', def.name));
+  for (const b of [sigmaBadge(def, item), statusBadge(def, item)]) if (b) line.appendChild(b);
+  name.appendChild(line);
+  const subs = [];
+  if (def.freq !== 'daily') subs.push(fmtDate(def, item.last.date).replace(/^\d{4}년 /, '').replace(/^(\d{4})\.(\d{2})\.(\d{2})$/, (_, y, m, d) => `${+m}/${+d}`));
+  if (item.forecast?.points?.length) {
+    const p = item.forecast.points[0];
+    subs.push(`전망 ${fmtForecastDate(def, p.date)} ${withUnit(def, p.value)}`);
   }
-  for (const it of movers) box.appendChild(tile(state.defs.get(it.id), it, { showSigma: true }));
+  if (subs.length) {
+    const sub = el('div', 'sub', subs.join(' · '));
+    if (item.forecast) sub.title = item.forecast.label;
+    name.appendChild(sub);
+  }
+  tr.appendChild(name);
+
+  const v = el('td', 'c-val');
+  v.appendChild(valueNode(def, item.last.value));
+  tr.appendChild(v);
+  for (const [k] of COLS) {
+    const td = el('td', `c-${k}`);
+    td.appendChild(SKIP[def.freq].includes(k) ? el('span', 'na', '') : chg(def, item.changes[k]));
+    tr.appendChild(td);
+  }
+  const sp = el('td', 'c-spark');
+  sp.appendChild(spark(item));
+  tr.appendChild(sp);
+
+  const open = () => openDetail(def.id);
+  tr.addEventListener('click', e => { if (!e.target.closest('a')) open(); });
+  tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+  return tr;
+}
+
+function renderGroups() {
+  const root = document.getElementById('groups');
+  const jump = document.getElementById('jump');
+  root.replaceChildren();
+  jump.replaceChildren();
+  for (const g of state.groups) {
+    const defs = [...state.defs.values()].filter(d => d.group === g.id && state.items.get(d.id)?.last);
+    if (!defs.length) continue;
+    const sec = el('section', 'panel board');
+    sec.id = `g-${g.id}`;
+    sec.setAttribute('aria-labelledby', `g-${g.id}-title`);
+    const head = el('div', 'panel-head');
+    const h = el('h2', null, g.name);
+    h.id = `g-${g.id}-title`;
+    head.appendChild(h);
+    const dailyDates = defs.filter(d => d.freq === 'daily').map(d => state.items.get(d.id).last.date).sort();
+    if (dailyDates.length) head.appendChild(el('span', 'meta', `${fmtDate({ freq: 'daily' }, dailyDates[dailyDates.length - 1])} 기준`));
+    sec.appendChild(head);
+
+    const table = el('table', 'mtable');
+    const tr = table.createTHead().insertRow();
+    for (const [cls, label] of [['c-name', '지표'], ['c-val', '현재'], ...COLS.map(([k, l]) => [`c-${k}`, l]), ['c-spark', '추세']]) {
+      const th = el('th', cls, label);
+      th.scope = 'col';
+      tr.appendChild(th);
+    }
+    const body = table.createTBody();
+    for (const d of defs) body.appendChild(row(d, state.items.get(d.id)));
+    sec.appendChild(table);
+    root.appendChild(sec);
+
+    const a = el('a', null, g.name);
+    a.href = `#g-${g.id}`;
+    jump.appendChild(a);
+  }
+}
+
+function renderKeys() {
+  const box = document.getElementById('keys');
+  box.replaceChildren();
+  for (const id of KEY_IDS) {
+    const def = state.defs.get(id), item = state.items.get(id);
+    if (!def || !item) continue;
+    const b = el('button', 'keyrow');
+    b.type = 'button';
+    b.dataset.id = id;
+    b.append(el('span', 'k-name', def.name), valueNode(def, item.last.value), chg(def, item.changes.prev), spark(item));
+    b.addEventListener('click', () => openDetail(id));
+    box.appendChild(b);
+  }
 }
 
 // 브리핑은 없어도 화면이 동작하도록 실패를 무시합니다 (pipeline/briefing.py 가 생성)
@@ -188,52 +217,46 @@ async function renderBriefing() {
     if (!r.ok) return;
     brief = await r.json();
   } catch { return; }
-  document.getElementById('briefing-headline').textContent = brief.headline;
+  document.getElementById('briefing-asof').textContent = `${fmtDate({ freq: 'daily' }, brief.as_of)} 마감 기준`;
+  const mood = document.getElementById('briefing-mood');
+  if (brief.mood && brief.mood !== '혼조') { mood.textContent = brief.mood; mood.hidden = false; }
+  document.getElementById('briefing-headline').textContent = brief.headline.replace(/^(위험회피|위험선호) · /, '');
+
   const list = document.getElementById('briefing-list');
   list.replaceChildren();
   for (const s of brief.stories || []) {
-    const li = document.createElement('li');
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'linklike';
-    btn.textContent = s.text;
-    if (state.defs.has(s.id)) btn.addEventListener('click', () => openDetail(s.id));
-    li.appendChild(btn);
-    if (s.headlines?.length) li.appendChild(headlineList(s, { links: true }));
+    const def = state.defs.get(s.id), item = state.items.get(s.id);
+    if (!def || !item) continue;
+    const li = el('li', 'story');
+    const top = el('button', 'story-top');
+    top.type = 'button';
+    top.addEventListener('click', () => openDetail(s.id));
+    top.append(el('span', 'nm-text', def.name), valueNode(def, item.last.value), chg(def, item.changes.prev));
+    if (s.big && item.sigma != null) top.appendChild(el('span', `badge sigma ${direction(item.changes.prev).cls}`, `평소 ${fmtNum(Math.abs(item.sigma), 1)}배`));
+    for (const c of s.text.split(' · ').slice(1).join(', ').split(', ').filter(Boolean)) top.appendChild(el('span', 'badge', c));
+    li.appendChild(top);
+    const h = s.headlines?.[0];
+    if (h) {
+      const p = el('p', 'why');
+      if (/^https?:\/\//.test(h.url)) {
+        const a = el('a', null, h.title);
+        a.href = h.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+        p.appendChild(a);
+      } else p.append(h.title);
+      if (h.source) p.appendChild(el('span', 'src', h.source));
+      li.appendChild(p);
+    }
     list.appendChild(li);
   }
-  if (!list.children.length) {
-    const li = document.createElement('li');
-    li.textContent = '평소 범위를 벗어난 움직임이 없었습니다.';
-    list.appendChild(li);
-  }
+  if (!list.children.length) list.appendChild(el('li', 'story quiet', '평소 범위를 벗어난 움직임이 없었습니다.'));
+
   for (const [key, rows] of [['reads', brief.reads], ['signals', brief.signals]]) {
     const ul = document.getElementById(`briefing-${key}`);
-    ul.replaceChildren(...(rows || []).map(t => Object.assign(document.createElement('li'), { textContent: t })));
-    ul.parentElement.hidden = !ul.children.length;
+    ul.replaceChildren(...(rows || []).map(t => el('li', null, t)));
+    ul.closest('.reads-wrap, .signals-wrap').hidden = !ul.children.length;
   }
+  document.getElementById('briefing-signal-count').textContent = (brief.signals || []).length ? `${brief.signals.length}` : '';
   document.getElementById('briefing-block').hidden = false;
-}
-
-function renderGroups() {
-  const root = document.getElementById('groups');
-  root.replaceChildren();
-  for (const g of state.groups) {
-    const defs = [...state.defs.values()].filter(d => d.group === g.id && state.items.get(d.id)?.last);
-    if (!defs.length) continue;
-    const sec = document.createElement('section');
-    sec.className = 'block';
-    sec.setAttribute('aria-labelledby', `g-${g.id}`);
-    const h = document.createElement('h2');
-    h.id = `g-${g.id}`;
-    h.textContent = g.name;
-    sec.appendChild(h);
-    const grid = document.createElement('div');
-    grid.className = 'grid';
-    for (const d of defs) grid.appendChild(tile(d, state.items.get(d.id)));
-    sec.appendChild(grid);
-    root.appendChild(sec);
-  }
 }
 
 // ── 금리 커브 ───────────────────────────────────────────
@@ -460,15 +483,6 @@ document.getElementById('detail-close').addEventListener('click', () => document
 document.getElementById('detail').addEventListener('click', e => { if (e.target.id === 'detail') e.target.close(); });
 document.getElementById('detail').addEventListener('close', () => { state.detail = null; });
 
-// ── 기간 선택 ───────────────────────────────────────────
-document.getElementById('period').addEventListener('click', e => {
-  const b = e.target.closest('button[data-period]');
-  if (!b) return;
-  state.period = b.dataset.period;
-  for (const x of document.querySelectorAll('#period button')) x.setAttribute('aria-checked', String(x === b));
-  renderGroups();
-});
-
 let latestCurve = null;
 function rerenderCharts() {
   renderCurve(latestCurve);
@@ -509,9 +523,9 @@ async function main() {
   if (stale || missing) msgs.push(`${stale + missing}개 지표는 이번에 새로 받지 못해 이전 데이터로 표시합니다.`);
   if (msgs.length) { notice.textContent = msgs.join(' '); notice.hidden = false; }
 
-  renderBriefing();
-  renderMovers();
   renderGroups();
+  renderKeys();
+  renderBriefing();
   latestCurve = latest.curve;
   renderCurve(latestCurve);
 }

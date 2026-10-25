@@ -8,7 +8,7 @@ function el(name, attrs = {}, parent) {
   return node;
 }
 
-export function sparkline(values, { width = 84, height = 36, color = 'var(--spark)' } = {}) {
+export function sparkline(values, { width = 84, height = 28, color = 'var(--spark)', dotColor = color } = {}) {
   const svg = el('svg', { viewBox: `0 0 ${width} ${height}`, class: 'spark', 'aria-hidden': 'true', preserveAspectRatio: 'none' });
   if (!values || values.length < 2) return svg;
   const min = Math.min(...values), max = Math.max(...values);
@@ -20,11 +20,11 @@ export function sparkline(values, { width = 84, height = 36, color = 'var(--spar
   ]);
   el('polyline', {
     points: pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' '),
-    fill: 'none', stroke: color, 'stroke-width': 1.5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+    fill: 'none', stroke: color, 'stroke-width': 1.25, 'stroke-linejoin': 'round', 'stroke-linecap': 'round',
     'vector-effect': 'non-scaling-stroke',
   }, svg);
   const [lx, ly] = pts[pts.length - 1];
-  el('circle', { cx: lx, cy: ly, r: 2.5, fill: color }, svg);
+  el('circle', { cx: lx, cy: ly, r: 2.5, fill: dotColor }, svg);
   return svg;
 }
 

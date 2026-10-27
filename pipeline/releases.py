@@ -21,7 +21,7 @@ BEA_URL = "https://www.bea.gov/news/schedule"
 MONTHS = {m: i for i, m in enumerate(["January", "February", "March", "April", "May", "June", "July", "August",
                                       "September", "October", "November", "December"], 1)}
 TZ = {"krmacro": "Asia/Seoul"}
-ORDINAL = {"1st": 1, "2nd": 2, "3rd": 3, "4th": 4}
+CATCH_UP_DAYS = 5  # 추정 발표일에서 이만큼 안에 새 값을 받으면 그날을 발표일로 봄
 
 
 # ── BEA 일정표 ─────────────────────────────────────────
@@ -116,7 +116,11 @@ def release_info(ind, last_date, prev_item, now, bea=()):
     prev_rel = (prev_item or {}).get("release") or {}
     prev_last_date = ((prev_item or {}).get("last") or {}).get("date")
     if prev_last_date and prev_last_date != last_date:
-        last = today.isoformat()  # 이번 수집에서 새 값이 들어옴
+        # 이번 수집에서 새 값이 들어옴. 추정 일정보다 한참 늦게 들어왔다면(출처 지연·출처 변경)
+        # 실제 발표일을 알 수 없으므로 비워 둠
+        past = [d for d in dates if d <= today]
+        if not est or (past and (today - past[-1]).days <= CATCH_UP_DAYS):
+            last = today.isoformat()
     elif prev_rel.get("last"):
         last = prev_rel["last"]
     elif not est:

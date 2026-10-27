@@ -57,3 +57,11 @@ def test_parse_bea_rows():
     rows = releases.parse_bea(html)
     assert rows == [(date(2026, 10, 29), "GDP (Advance Estimate), 3rd Quarter 2026"),
                     (date(2026, 11, 25), "GDP (Second Estimate) and Corporate Profits, 3rd Quarter 2026")]
+
+
+def test_late_catch_up_does_not_claim_release_date():
+    prev = {"last": {"date": "2026-04-01"}}
+    # 한국은행 속보 추정일(10/22)보다 6일 늦게 받은 값은 발표일을 모름
+    assert releases.release_info(KRGDP, "2026-07-01", prev, NOW)["last"] is None
+    on_time = releases.release_info(KRGDP, "2026-07-01", prev, datetime(2026, 10, 23, 1, tzinfo=timezone.utc))
+    assert on_time["last"] == "2026-10-23"

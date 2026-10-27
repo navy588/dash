@@ -136,15 +136,22 @@ function daysUntil(s) {
   return Math.round((parseDate(s) - t) / 864e5);
 }
 
+// 추정 날짜는 정확한 날 대신 "11월 중순"처럼 대략 표시
+function fmtNext(r) {
+  if (!r.est) return fmtMD(r.next);
+  const d = parseDate(r.next);
+  return `${d.getMonth() + 1}월 ${d.getDate() <= 10 ? '초' : d.getDate() <= 20 ? '중순' : '하순'}`;
+}
+
 function releaseNode(item) {
   const r = item.release;
   if (!r?.next) return null;
   const n = daysUntil(r.next);
   if (n < 0) return null;
   const line = el('span', 'mc-rel');
-  line.append(`다음 발표 ${fmtMD(r.next)}${r.est ? ' 예정' : ''}`);
-  if (n <= 3) line.appendChild(el('span', `dday${n === 0 ? ' today' : ''}`, n === 0 ? '오늘 발표' : `D-${n}`));
-  line.title = `${r.last ? `이번 발표 ${fmtMD(r.last)} · ` : ''}다음 발표 ${fmtMD(r.next)}${r.est ? ' (평소 일정으로 추정)' : ''}`;
+  line.append(`다음 발표 ${fmtNext(r)}`);
+  if (!r.est && n <= 3) line.appendChild(el('span', `dday${n === 0 ? ' today' : ''}`, n === 0 ? '오늘 발표' : `D-${n}`));
+  line.title = `${r.last ? `이번 발표 ${fmtMD(r.last)} · ` : ''}다음 발표 ${fmtNext(r)}${r.est ? ' (평소 일정으로 추정)' : ''}`;
   return line;
 }
 
@@ -153,7 +160,7 @@ function releaseText(item) {
   if (!r) return '';
   const parts = [];
   if (r.last) parts.push(`이번 발표 ${fmtMD(r.last)}`);
-  if (r.next && daysUntil(r.next) >= 0) parts.push(`다음 발표 ${fmtMD(r.next)}${r.est ? ' 예정(추정)' : ''}`);
+  if (r.next && daysUntil(r.next) >= 0) parts.push(`다음 발표 ${fmtNext(r)}${r.est ? '(추정)' : ''}`);
   return parts.join(' · ');
 }
 

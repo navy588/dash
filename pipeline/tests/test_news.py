@@ -8,7 +8,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import collect  # noqa: E402
 import news  # noqa: E402
-from fakes import fake_bis, fake_fred, fake_lme, fake_news, fake_yahoo  # noqa: E402
+from fakes import fake_bis, fake_ecos, fake_fred, fake_lme, fake_news, fake_yahoo  # noqa: E402
 
 REG = collect.load_registry()
 
@@ -40,7 +40,7 @@ def test_parse_rss_strips_source():
 
 def test_build_notes_reuses_previous(tmp_path, monkeypatch):
     monkeypatch.setattr(news, "MAX_QUERIES_PER_RUN", 10**6)
-    latest, series = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme, fetch_bis=fake_bis,
+    latest, series = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme, fetch_bis=fake_bis, fetch_ecos=fake_ecos,
                                      log=lambda *_: None)
     collect.write_output(tmp_path, REG, latest, series)
     calls = []
@@ -74,7 +74,7 @@ def test_build_notes_reuses_previous(tmp_path, monkeypatch):
 
 
 def test_search_failure_does_not_stop(tmp_path):
-    latest, series = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme, fetch_bis=fake_bis,
+    latest, series = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme, fetch_bis=fake_bis, fetch_ecos=fake_ecos,
                                      log=lambda *_: None)
     collect.write_output(tmp_path, REG, latest, series)
 
@@ -86,7 +86,7 @@ def test_search_failure_does_not_stop(tmp_path):
 
 
 def test_budget_fills_latest_first(tmp_path, monkeypatch):
-    latest, series = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme, fetch_bis=fake_bis,
+    latest, series = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme, fetch_bis=fake_bis, fetch_ecos=fake_ecos,
                                      log=lambda *_: None)
     collect.write_output(tmp_path, REG, latest, series)
     monkeypatch.setattr(news, "MAX_QUERIES_PER_RUN", 50)

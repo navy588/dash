@@ -63,3 +63,9 @@ def fake_prices(tickers):
 
 def fake_caps(tickers):
     return {t: 1e9 * (len(tickers) - i) ** 1.5 for i, t in enumerate(tickers)}
+
+
+def fake_ecos(code, key=None, session=None, periods=20):
+    if "/Q/" in code:
+        return pd.Series([0.6, 1.2], index=pd.to_datetime(["2026-04-01", "2026-07-01"]))
+    return monthly(start="2024-01-01")

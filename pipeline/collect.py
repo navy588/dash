@@ -118,9 +118,10 @@ def parse_lme_html(html):
 
 
 def fetch_bis(code, session=None):
-    """BIS 중앙은행 정책금리(WS_CBPOL). code 예: D.KR (일별, 한국)"""
+    """BIS 통계. code 예: D.KR (정책금리 WS_CBPOL, 일별 한국), WS_LONG_CPI/M.KR.771 (데이터셋/키)"""
     session = session or _session()
-    r = session.get(f"https://stats.bis.org/api/v1/data/WS_CBPOL/{code}", timeout=HTTP_TIMEOUT,
+    dataset, key = code.split("/", 1) if "/" in code else ("WS_CBPOL", code)
+    r = session.get(f"https://stats.bis.org/api/v1/data/{dataset}/{key}", timeout=HTTP_TIMEOUT,
                     params={"format": "csv", "startPeriod": FETCH_START})
     r.raise_for_status()
     return parse_bis_csv(r.text)

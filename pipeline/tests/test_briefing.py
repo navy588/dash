@@ -122,3 +122,13 @@ def test_write_outputs(tmp_path):
     assert "## 분야별 요약" not in md
     if "## 무엇이 왜 움직였나" in md:
         assert "](https://example.com/" in md
+
+
+def test_importance_beats_raw_size():
+    data = quiet(latest())
+    move(data, "natgas", 15.8, -2.7 * -1)
+    move(data, "usdcny", -0.33, -2.1)
+    move(data, "kospi", 3.1, 2.0)
+    move(data, "wti", 2.0, 1.6)
+    brief = briefing.build(REG, data, today=TODAY)
+    assert [s["id"] for s in brief["stories"]][:2] == ["kospi", "wti"]

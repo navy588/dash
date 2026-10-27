@@ -6,10 +6,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import breakdown  # noqa: E402
 import briefing  # noqa: E402
 import collect  # noqa: E402
 import news  # noqa: E402
-from fakes import fake_bis, fake_fred, fake_lme, fake_news, fake_yahoo  # noqa: E402
+from fakes import fake_bis, fake_caps, fake_fred, fake_lme, fake_news, fake_prices, fake_yahoo  # noqa: E402
 
 if __name__ == "__main__":
     reg = collect.load_registry()
@@ -18,3 +19,4 @@ if __name__ == "__main__":
     collect.write_output(out, reg, latest, series)
     news.build_notes(reg, out, search=fake_news, load_previous=lambda *a: {}, sleep=0)
     briefing.write(out)
+    breakdown.write(out, fetch_fred=fake_fred, fetch_prices=fake_prices, fetch_caps=fake_caps)

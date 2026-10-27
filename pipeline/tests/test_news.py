@@ -45,23 +45,32 @@ def test_build_notes_reuses_previous(tmp_path, monkeypatch):
     collect.write_output(tmp_path, REG, latest, series)
     calls = []
 
-    def search(q, d, session=None):
-        calls.append((q, d))
-        return fake_news(q, d)
+    def search(q, start, end, session=None):
+        calls.append((q, start))
+        return fake_news(q, start, end)
 
     news.build_notes(REG, tmp_path, search=search, load_previous=lambda *a: {}, sleep=0, log=lambda *_: None)
     first = len(calls)
     assert first > 0
     # 최신 날짜부터 검색
-    assert calls[0][1] == max(d for _, d in calls)
+    assert calls[0][1] >= pd.Timestamp("2026-10-21")
     note = json.loads((tmp_path / "notes" / "kospi.json").read_text(encoding="utf-8"))
     assert note["query"] == "코스피"
-    prev = {i["id"]: {e["date"]: e for e in json.loads((tmp_path / "notes" / f"{i['id']}.json").read_text(encoding="utf-8"))["events"]}
+    prev = {i["id"]: json.loads((tmp_path / "notes" / f"{i['id']}.json").read_text(encoding="utf-8"))
             for i in REG["indicators"] if (tmp_path / "notes" / f"{i['id']}.json").exists()}
     calls.clear()
     news.build_notes(REG, tmp_path, search=search, load_previous=lambda url, ind_id, s: prev.get(ind_id, {}),
-                     sleep=0, log=lambda *_: None)
+                     sleep=0, log=lambda *_: None, today="2026-12-31")
     assert calls == []  # 모두 재사용
+
+    # 규칙이 바뀐 옛 배포본: 일별 지표는 맞는 헤드라인만 남기고, 월별 지표는 다시 검색
+    old = {k: {**v, "rules": 1} for k, v in prev.items()}
+    old["kospi"]["events"][-1]["headlines"] = [{"title": "중국 증시 급락", "url": "u", "source": "s"}]
+    news.build_notes(REG, tmp_path, search=search, load_previous=lambda url, ind_id, s: old.get(ind_id, {}),
+                     sleep=0, log=lambda *_: None, today="2026-12-31")
+    searched = {q.split(" ")[0] for q, _ in calls}
+    assert "코스피" in searched and "미국" in searched
+    assert sum(q == "코스피" for q, _ in calls) == 1
 
 
 def test_search_failure_does_not_stop(tmp_path):
@@ -85,3 +94,35 @@ def test_budget_fills_latest_first(tmp_path, monkeypatch):
     assert stats["searched"] == 50 and stats["pending"] > 0
     kospi = json.loads((tmp_path / "notes" / "kospi.json").read_text(encoding="utf-8"))["events"]
     assert kospi[-1]["headlines"] and not kospi[0]["headlines"]
+
+
+DEFS = {i["id"]: i for i in REG["indicators"]}
+
+
+def test_country_matching_for_us_cpi():
+    cpi = DEFS["cpi"]
+    period = news.search_plan(cpi, pd.Timestamp("2026-09-01"))[3]
+    keep = ["美 9월 소비자물가 3.0% 상승…예상 하회", "미국 9월 CPI 둔화에 연준 인하 기대"]
+    drop = ["중국 9월 소비자물가 0.3% 하락", "9월 소비자물가 2.1%↑…국내 체감물가 여전",
+            "미국 8월 CPI 3.1%", "한국·미국 9월 소비자물가 비교"]
+    assert [t for t in keep + drop if news.relevant(t, cpi, period)] == keep
+
+
+def test_search_plan_uses_release_month():
+    q, start, end, period = news.search_plan(DEFS["cpi"], pd.Timestamp("2026-09-01"))
+    assert q == "미국 소비자물가 CPI 9월" and start == pd.Timestamp("2026-10-01") and end == pd.Timestamp("2026-11-01")
+    q, start, end, period = news.search_plan(DEFS["gdp"], pd.Timestamp("2026-07-01"))
+    assert q.endswith("3분기") and start == pd.Timestamp("2026-10-01") and period == ["3분기"]
+    q, start, end, period = news.search_plan(DEFS["kospi"], pd.Timestamp("2026-10-23"))
+    assert (q, start, period) == ("코스피", pd.Timestamp("2026-10-22"), [])
+
+
+def test_every_indicator_has_match_rules():
+    for ind in REG["indicators"]:
+        assert ind.get("news") and ind.get("match"), ind["id"]
+        assert news.relevant(ind["news"], ind) or ind["id"] in {"spx", "taiex", "dxy", "fedfunds", "ttf", "natgas", "gold"}, ind["id"]
+
+
+def test_pick_dedupes_and_limits():
+    items = [{"title": t} for t in ["코스피 2% 급락", "코스피 2% 급락 ", "환율 급등", "코스피 반등", "코스피 외국인", "코스피 4"]]
+    assert [h["title"] for h in news.pick(items, DEFS["kospi"])] == ["코스피 2% 급락", "코스피 반등", "코스피 외국인"]

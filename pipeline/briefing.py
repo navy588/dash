@@ -3,7 +3,8 @@
     python pipeline/briefing.py site/data     # site/data/briefing.json, briefing.md 생성
 
 카드에 이미 있는 숫자를 다시 나열하지 않고, 다음을 문장으로 묶습니다.
-- 오늘의 이야기: 평소보다 크게 움직인 지표와 그날의 뉴스 헤드라인(notes/, pipeline/news.py가 생성)
+- 오늘의 이야기: 평소보다 크게 움직인 지표와 그날의 뉴스 헤드라인(notes/, pipeline/news.py가 생성).
+  순서는 '평소 대비 배수 × 중요도'(IMPORTANCE)로 정해, 덜 중요한 지표가 크게 튀어도 핵심 지표보다 앞서지 않습니다.
 - 시장 해석: 위험선호/위험회피 판정, 미 국채 커브 모양(불·베어 스티프닝/플래트닝), 유가와 금리의 조합
 - 눈여겨볼 점: 52주 신고가·신저가, 5거래일 이상 연속 상승·하락, 연초 대비 최고·최저 자산, 전망치와 실제치 차이
 """
@@ -32,6 +33,23 @@ MEANING = {
     "dxy": ("달러 강세", "달러 약세"),
     "vix": ("시장 불안 확대", "시장 불안 완화"),
 }
+
+# 오늘의 이야기 순위에 쓰는 중요도 (없으면 그룹 기본값). 경제 > 원자재 > 시장 순으로 무게를 둡니다.
+IMPORTANCE = {
+    "wti": 1.0, "ttf": 0.95, "ironore": 0.9, "copper": 0.9, "aluminum": 0.8, "nickel": 0.75,
+    "gold": 0.8, "jkm": 0.6, "brent": 0.5, "natgas": 0.45, "silver": 0.45, "bitcoin": 0.55,
+    "kospi": 1.0, "kosdaq": 0.75, "spx": 1.0, "nasdaq": 1.0, "dow": 0.65, "sox": 0.8, "vix": 0.7,
+    "qld": 0.25, "tqqq": 0.25, "nikkei": 0.65, "shanghai": 0.65,
+    "usdkrw": 1.0, "dxy": 0.8, "usdjpy": 0.65, "jpykrw": 0.55,
+    "ust10y": 1.0, "ust2y": 0.8, "fedfunds": 1.0, "krbase": 1.0, "mortgage30": 0.35,
+}
+GROUP_IMPORTANCE = {"macro": 1.0, "krmacro": 1.0, "commodity": 0.6, "korea": 0.8, "us": 0.6,
+                    "global": 0.5, "fx": 0.45, "rates": 0.5}
+
+
+def importance(ind):
+    return IMPORTANCE.get(ind["id"], GROUP_IMPORTANCE.get(ind["group"], 0.5))
+
 
 # 위험회피일 때 오르는(+1) / 내리는(-1) 지표
 RISK_OFF = {"spx": -1, "nasdaq": -1, "kospi": -1, "vix": +1, "gold": +1, "ust10y": -1, "dxy": +1,
@@ -243,13 +261,13 @@ def build(registry, latest, series=None, notes=None, today=None):
     daily_dates = [it["last"]["date"] for k, it in fresh.items() if defs[k]["freq"] == "daily"]
     as_of = max(daily_dates) if daily_dates else today.isoformat()
 
-    # 1) 오늘의 이야기: 큰 움직임 순, 적으면 상위 변동으로 채움
+    # 1) 오늘의 이야기: 평소 대비 1배 이상 움직인 지표를 (배수 × 중요도) 순으로, 3~5개
     ranked = sorted((it for k, it in fresh.items()
                      if defs[k]["freq"] in ("daily", "weekly") and it.get("sigma") is not None
-                     and _prev(it) is not None and k != "t10y2y"),
-                    key=lambda it: -abs(it["sigma"]))
-    big = [it for it in ranked if abs(it["sigma"]) >= SIGMA_THRESHOLD][:MAX_STORIES]
-    picked = big + [it for it in ranked if it not in big and abs(it["sigma"]) >= 1][:max(0, MIN_STORIES - len(big))]
+                     and _prev(it) is not None and k != "t10y2y" and abs(it["sigma"]) >= 1),
+                    key=lambda it: -abs(it["sigma"]) * importance(defs[it["id"]]))
+    picked = ranked[:MIN_STORIES] + [it for it in ranked[MIN_STORIES:MAX_STORIES]
+                                     if abs(it["sigma"]) >= SIGMA_THRESHOLD and importance(defs[it["id"]]) >= 0.6]
 
     stories = []
     for it in picked:

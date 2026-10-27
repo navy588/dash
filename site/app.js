@@ -1,11 +1,12 @@
-import { sparkline, lineChart, timeTicks } from './chart.js';
+import { sparkline, lineChart, timeTicks, bars, stackChart, treemap } from './chart.js';
 
 const DATA = 'data';
 const FREQ_PREV = { daily: '전일', weekly: '전주', monthly: '전월', quarterly: '전분기' };
 const STALE_DAYS = { daily: 5, weekly: 12, monthly: 75, quarterly: 200 };
 const SIGMA_THRESHOLD = 2;
 
-const state = { period: 'prev', tab: null, defs: new Map(), items: new Map(), groups: [], seriesCache: new Map(), detail: null, range: '1y' };
+const state = { period: 'prev', defs: new Map(), items: new Map(), groups: [], seriesCache: new Map(), detail: null, range: '1y',
+  markets: null, market: null, mapPeriod: 'prev', breakdowns: new Set() };
 
 // ── 테마 ───────────────────────────────────────────────
 (function initTheme() {
@@ -133,6 +134,25 @@ function ariaFor(def, item, period = 'prev') {
   return `${def.name} ${withUnit(def, item.last.value)}, ${label} ${c ? fmtChange(def, c) : '변화 없음'}, ${fmtDate(def, item.last.date)} 기준. 자세히 보기`;
 }
 
+// 지표 옆 동그란 표식 (나라·자산을 한눈에)
+const AVATAR = {
+  nikkei: 'JP', shanghai: 'CN', hangseng: 'HK', taiex: 'TW', stoxx50: 'EU', dax: 'DE', ftse: 'UK',
+  usdkrw: '₩', jpykrw: '¥', dxy: '$', eurusd: '€', usdjpy: '¥', usdcny: '元', gbpusd: '£',
+  wti: 'OIL', brent: 'OIL', ttf: 'GAS', natgas: 'GAS', jkm: 'LNG', ironore: 'Fe', copper: 'Cu',
+  aluminum: 'Al', nickel: 'Ni', gold: 'Au', silver: 'Ag', bitcoin: '₿', krbase: 'KR', qld: '2x', tqqq: '3x',
+};
+const GROUP_AVATAR = { macro: 'US', krmacro: 'KR', korea: 'KR', us: 'US', rates: 'US' };
+function avatar(def) {
+  const t = AVATAR[def.id] || GROUP_AVATAR[def.group] || def.name.slice(0, 2);
+  const a = el('span', `av g-${def.group}`, t);
+  a.setAttribute('aria-hidden', 'true');
+  if (t.length >= 3) a.classList.add('sm');
+  return a;
+}
+
+const isMacro = def => def.group === 'macro' || def.group === 'krmacro';
+const periodFor = def => (SKIP[def.freq].includes(state.period) ? null : state.period);
+
 // ── 주요 지표 카드 ─────────────────────────────────────
 function renderKeys() {
   const box = document.getElementById('keys');
@@ -140,40 +160,72 @@ function renderKeys() {
   for (const id of KEY_IDS) {
     const def = state.defs.get(id), item = state.items.get(id);
     if (!def || !item) continue;
-    const b = el('button', 'card keycard');
+    const b = el('button', 'keycard');
     b.type = 'button';
     b.dataset.id = id;
     b.setAttribute('aria-label', ariaFor(def, item));
     const top = el('div', 'kc-top');
-    top.append(el('span', 'kc-name', def.name), pill(def, item.changes.prev));
-    b.append(top, valueNode(def, item.last.value, 'kc-val'), spark(item, { width: 160, height: 40, area: true }));
+    top.append(avatar(def), el('span', 'kc-name', def.name));
+    const mid = el('div', 'kc-mid');
+    mid.append(valueNode(def, item.last.value, 'kc-val'), pill(def, item.changes.prev));
+    const sp = item.spark || [];
+    const range = el('div', 'kc-range');
+    if (sp.length > 1) {
+      range.append(el('span', null, `최저 ${fmtValue(def, Math.min(...sp))}`), el('span', null, `최고 ${fmtValue(def, Math.max(...sp))}`));
+    }
+    b.append(top, mid, spark(item, { width: 200, height: 64, area: true }), range);
     b.addEventListener('click', () => openDetail(id));
     box.appendChild(b);
   }
 }
 
 // ── 분야별 시세 ─────────────────────────────────────────
+function changeNode(def, item) {
+  const period = periodFor(def);
+  const p = period ? pill(def, item.changes[period]) : el('span', 'pill na', '–');
+  if (period === 'prev' || !period) p.title = `${FREQ_PREV[def.freq]} 대비`;
+  return p;
+}
+
 function listRow(def, item) {
-  const b = el('button', 'lrow');
+  const b = el('button', 'lrow ind');
   b.type = 'button';
   b.dataset.id = def.id;
-  b.setAttribute('aria-label', ariaFor(def, item, SKIP[def.freq].includes(state.period) ? 'prev' : state.period));
+  b.setAttribute('aria-label', ariaFor(def, item, periodFor(def) || 'prev'));
 
   const left = el('span', 'lr-left');
   const nm = el('span', 'lr-name');
   nm.append(el('span', 'nm-text', def.name), ...badges(def, item));
   left.appendChild(nm);
   const sub = subText(def, item);
-  if (sub) left.appendChild(el('span', 'lr-sub', sub));
+  left.appendChild(el('span', 'lr-sub', sub || fmtDate(def, item.last.date)));
 
   const right = el('span', 'lr-right');
-  right.appendChild(valueNode(def, item.last.value, 'lr-val'));
-  const period = SKIP[def.freq].includes(state.period) ? null : state.period;
-  const p = period ? pill(def, item.changes[period]) : el('span', 'pill na', '–');
-  if (period === 'prev' || !period) p.title = `${FREQ_PREV[def.freq]} 대비`;
-  right.appendChild(p);
+  right.append(valueNode(def, item.last.value, 'lr-val'), changeNode(def, item));
+  b.append(avatar(def), left, spark(item, { width: 120, height: 36, area: true }), right);
+  b.addEventListener('click', () => openDetail(def.id));
+  return b;
+}
 
-  b.append(left, spark(item, { width: 72, height: 28 }), right);
+// 경제지표는 카드: 최근 발표치 막대와 이전 발표치
+function macroCard(def, item) {
+  const b = el('button', 'mcard ind');
+  b.type = 'button';
+  b.dataset.id = def.id;
+  b.setAttribute('aria-label', ariaFor(def, item, periodFor(def) || 'prev'));
+  const top = el('span', 'mc-top');
+  top.append(el('span', 'mc-name', def.name), ...badges(def, item));
+  const mid = el('span', 'mc-mid');
+  mid.append(valueNode(def, item.last.value, 'mc-val'), changeNode(def, item));
+  const prev = item.changes.prev;
+  const sub = [`${fmtDate(def, item.last.date)}${def.freq === 'daily' ? ' 기준' : ''}`];
+  if (prev?.ref != null) sub.push(`이전 ${withUnit(def, prev.ref)}`);
+  if (item.forecast?.points?.length) sub.push(subText(def, item).split(' · ').pop());
+  const sp = (item.spark || []).slice(def.freq === 'quarterly' ? -12 : def.freq === 'monthly' ? -24 : -60);
+  const chart = def.freq === 'daily' || def.freq === 'weekly'
+    ? sparkline(sp, { width: 240, height: 48, color: `var(--${trendCls(item)})`, area: true })
+    : bars(sp, { width: 240, height: 48, color: `var(--${trendCls({ spark: sp.slice(-2) })})` });
+  b.append(top, mid, chart, el('span', 'mc-sub', sub.join(' · ')));
   b.addEventListener('click', () => openDetail(def.id));
   return b;
 }
@@ -181,33 +233,70 @@ function listRow(def, item) {
 function renderTabs() {
   const tabs = document.getElementById('tabs');
   tabs.replaceChildren();
-  for (const g of state.groups) {
-    if (![...state.defs.values()].some(d => d.group === g.id && state.items.get(d.id)?.last)) continue;
-    const t = el('button', 'tab', g.name);
-    t.type = 'button';
-    t.setAttribute('role', 'tab');
+  for (const g of visibleGroups()) {
+    const t = el('a', 'tab', g.name);
+    t.href = `#g-${g.id}`;
     t.dataset.group = g.id;
-    t.setAttribute('aria-selected', String(g.id === state.tab));
-    t.addEventListener('click', () => {
-      state.tab = g.id;
-      try { localStorage.setItem('tab', g.id); } catch {}
-      for (const x of tabs.children) x.setAttribute('aria-selected', String(x === t));
-      renderGroups();
+    t.addEventListener('click', e => {
+      e.preventDefault();
+      document.getElementById(`g-${g.id}`).scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+      setActiveTab(g.id);
     });
     tabs.appendChild(t);
   }
 }
 
+function setActiveTab(id) {
+  for (const t of document.querySelectorAll('#tabs .tab')) {
+    const on = t.dataset.group === id;
+    t.classList.toggle('on', on);
+    if (on) t.setAttribute('aria-current', 'true'); else t.removeAttribute('aria-current');
+    if (on && t.scrollIntoView && t.parentElement.scrollWidth > t.parentElement.clientWidth) {
+      t.parentElement.scrollTo({ left: t.offsetLeft - 16, behavior: 'smooth' });
+    }
+  }
+}
+
+function visibleGroups() {
+  return state.groups.filter(g => [...state.defs.values()].some(d => d.group === g.id && state.items.get(d.id)?.last));
+}
+
+let spy;
 function renderGroups() {
   const root = document.getElementById('groups');
   root.replaceChildren();
-  const defs = [...state.defs.values()].filter(d => d.group === state.tab && state.items.get(d.id)?.last);
-  for (const d of defs) root.appendChild(listRow(d, state.items.get(d.id)));
-  const dates = defs.filter(d => d.freq === 'daily').map(d => state.items.get(d.id).last.date).sort();
-  const foot = el('p', 'list-foot');
-  foot.textContent = (dates.length ? `${fmtDate({ freq: 'daily' }, dates[dates.length - 1])} 기준 · ` : '') +
-    `변화는 ${state.period === 'prev' ? '직전 발표(전일·전주·전월) 대비' : PERIOD_LABEL[state.period] + ' 대비'} · 추세선은 최근 3개월`;
-  root.appendChild(foot);
+  for (const g of visibleGroups()) {
+    const defs = [...state.defs.values()].filter(d => d.group === g.id && state.items.get(d.id)?.last);
+    const sec = el('section', 'gsec');
+    sec.id = `g-${g.id}`;
+    sec.dataset.group = g.id;
+    const head = el('div', 'gsec-head');
+    head.append(el('h3', null, g.name), el('span', 'count', `${defs.length}`));
+    if (state.breakdowns.size && defs.some(d => state.breakdowns.has(d.id))) head.appendChild(el('span', 'tag', '분해 차트'));
+    sec.appendChild(head);
+    if (isMacro(defs[0])) {
+      const grid = el('div', 'mgrid');
+      for (const d of defs) grid.appendChild(macroCard(d, state.items.get(d.id)));
+      sec.appendChild(grid);
+    } else {
+      const card = el('div', 'card list');
+      for (const d of defs) card.appendChild(listRow(d, state.items.get(d.id)));
+      sec.appendChild(card);
+    }
+    root.appendChild(sec);
+  }
+  const dates = [...state.defs.values()].filter(d => d.freq === 'daily' && state.items.get(d.id)).map(d => state.items.get(d.id).last.date).sort();
+  root.appendChild(el('p', 'list-foot',
+    (dates.length ? `${fmtDate({ freq: 'daily' }, dates[dates.length - 1])} 기준 · ` : '') +
+    `변화는 ${state.period === 'prev' ? '직전 발표(전일·전주·전월) 대비' : PERIOD_LABEL[state.period] + ' 대비'} · 추세선은 최근 3개월`));
+
+  // 스크롤 위치에 맞춰 분야 탭 강조
+  spy?.disconnect();
+  spy = new IntersectionObserver(entries => {
+    const vis = entries.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+    if (vis) setActiveTab(vis.target.dataset.group);
+  }, { rootMargin: '-140px 0px -60% 0px' });
+  for (const sec of root.querySelectorAll('.gsec')) spy.observe(sec);
 }
 
 document.getElementById('period').addEventListener('click', e => {
@@ -216,6 +305,210 @@ document.getElementById('period').addEventListener('click', e => {
   state.period = b.dataset.period;
   for (const x of document.querySelectorAll('#period button')) x.setAttribute('aria-checked', String(x === b));
   renderGroups();
+});
+
+// ── 시장 지도 (트리맵) ──────────────────────────────────
+const MAP_SCALE = { prev: 3, w1: 6, m1: 10, ytd: 30, y1: 40 };
+const MAP_PERIOD_LABEL = { prev: '하루', w1: '1주', m1: '1개월', ytd: '연초 대비', y1: '1년' };
+
+function heatColor(v, period) {
+  if (v == null) return { bg: 'var(--tile)', ink: 'var(--ink-2)' };
+  const k = Math.min(Math.abs(v) / MAP_SCALE[period], 1);
+  const pct = Math.round(18 + k * 72);
+  const hue = v > 0 ? 'var(--up)' : v < 0 ? 'var(--down)' : 'var(--tile)';
+  return { bg: `color-mix(in oklab, ${hue} ${pct}%, var(--tile))`, ink: pct > 48 ? '#fff' : 'var(--ink)' };
+}
+
+const fmtPct = v => (v == null ? '–' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmtNum(Math.abs(v), 2)}%`);
+const fmtCap = (v, krw) => krw ? `${fmtNum(v / 1e12, 1)}조원` : `$${fmtNum(v / 1e9, 0)}B`;
+
+function drawTreemap(box, market, period, { compact = false } = {}) {
+  const krw = market.id === 'kospi' || market.id === 'kosdaq';
+  const bySector = new Map();
+  for (const it of market.items) {
+    if (!bySector.has(it.s)) bySector.set(it.s, []);
+    const v = it.chg[period];
+    const c = heatColor(v, period);
+    bySector.get(it.s).push({
+      value: it.cap, label: krw ? it.n : it.t, sub: fmtPct(v), color: c.bg, ink: c.ink,
+      tip: tip => {
+        const h = el('strong', null, `${it.n}${krw ? '' : ` (${it.t})`}`);
+        const r1 = el('div', 'row');
+        r1.append(el('span', `big ${v > 0 ? 'up' : v < 0 ? 'down' : 'flat'}`, fmtPct(v)), el('span', 'muted', MAP_PERIOD_LABEL[period]));
+        const r2 = el('div', 'muted', `${it.s} · 비중 ${fmtNum(it.w, 2)}% · 시총 ${fmtCap(it.cap, krw)}`);
+        const r3 = el('div', 'muted', `${krw ? '' : '$'}${fmtNum(it.price, krw ? 0 : 2)}${krw ? '원' : ''} · ${it.date.replaceAll('-', '.')}`);
+        tip.append(h, r1, r2, r3);
+      },
+    });
+  }
+  treemap(box, [...bySector].map(([name, items]) => ({ name, items })), { header: compact ? 0 : 18 });
+}
+
+function mapSide(market, period) {
+  const side = document.getElementById('map-side');
+  side.replaceChildren();
+  const krw = market.id === 'kospi' || market.id === 'kosdaq';
+  const items = market.items.filter(i => i.chg[period] != null);
+  // 지수 기여도 ≈ 비중 × 등락률
+  const contrib = items.map(i => ({ ...i, c: (i.w * i.chg[period]) / 100 })).sort((a, b) => b.c - a.c);
+  const total = contrib.reduce((a, b) => a + b.c, 0);
+  const sum = el('div', 'ms-sum');
+  sum.append(el('span', 'muted', `상위 ${items.length}종목 가중 등락 (${MAP_PERIOD_LABEL[period]})`), el('strong', total > 0 ? 'up' : total < 0 ? 'down' : '', fmtPct(total)));
+  side.appendChild(sum);
+
+  const list = (title, rows) => {
+    const sec = el('div', 'ms-block');
+    sec.appendChild(el('h4', null, title));
+    const mx = Math.max(...contrib.map(r => Math.abs(r.c)), 1e-9);
+    for (const r of rows) {
+      const row = el('div', 'ms-row');
+      const bar = el('span', `ms-bar ${r.c > 0 ? 'up' : 'down'}`);
+      bar.style.width = `${Math.max(4, (Math.abs(r.c) / mx) * 100)}%`;
+      const name = el('span', 'ms-name', krw ? r.n : `${r.n}`);
+      const v = el('span', `ms-v ${r.chg[period] > 0 ? 'up' : r.chg[period] < 0 ? 'down' : ''}`, fmtPct(r.chg[period]));
+      const barWrap = el('span', 'ms-barwrap');
+      barWrap.appendChild(bar);
+      row.append(name, barWrap, v);
+      row.title = `지수 기여 ${r.c >= 0 ? '+' : '−'}${fmtNum(Math.abs(r.c), 2)}%p · 비중 ${fmtNum(r.w, 2)}%`;
+      sec.appendChild(row);
+    }
+    side.appendChild(sec);
+  };
+  list('지수를 끌어올린 종목', contrib.filter(r => r.c > 0).slice(0, 5));
+  list('지수를 끌어내린 종목', contrib.filter(r => r.c < 0).reverse().slice(0, 5));
+
+  // 업종별 가중 등락
+  const sectors = new Map();
+  for (const i of items) {
+    const s = sectors.get(i.s) || { w: 0, c: 0 };
+    s.w += i.w; s.c += i.w * i.chg[period];
+    sectors.set(i.s, s);
+  }
+  const sec = el('div', 'ms-block');
+  sec.appendChild(el('h4', null, '업종별 등락'));
+  const rows = [...sectors].map(([n, s]) => ({ n, v: s.c / s.w, w: s.w })).sort((a, b) => b.v - a.v);
+  const mx = Math.max(...rows.map(r => Math.abs(r.v)), 1e-9);
+  for (const r of rows) {
+    const row = el('div', 'ms-row');
+    const barWrap = el('span', 'ms-barwrap center');
+    const bar = el('span', `ms-bar ${r.v > 0 ? 'up' : 'down'}`);
+    bar.style.width = `${(Math.abs(r.v) / mx) * 50}%`;
+    bar.style[r.v > 0 ? 'left' : 'right'] = '50%';
+    barWrap.appendChild(bar);
+    row.append(el('span', 'ms-name', r.n), barWrap, el('span', `ms-v ${r.v > 0 ? 'up' : r.v < 0 ? 'down' : ''}`, fmtPct(r.v)));
+    row.title = `비중 ${fmtNum(r.w, 1)}%`;
+    sec.appendChild(row);
+  }
+  side.appendChild(sec);
+}
+
+function renderMap() {
+  if (!state.markets?.markets?.length) return;
+  const market = state.markets.markets.find(m => m.id === state.market) || state.markets.markets[0];
+  state.market = market.id;
+  const seg = document.getElementById('map-market');
+  if (!seg.children.length) {
+    for (const m of state.markets.markets) {
+      const b = el('button', null, m.name);
+      b.type = 'button'; b.setAttribute('role', 'radio'); b.dataset.market = m.id;
+      b.addEventListener('click', () => { state.market = m.id; try { localStorage.setItem('market', m.id); } catch {} renderMap(); });
+      seg.appendChild(b);
+    }
+  }
+  for (const b of seg.children) b.setAttribute('aria-checked', String(b.dataset.market === market.id));
+  document.getElementById('map-section').hidden = false;
+  drawTreemap(document.getElementById('map'), market, state.mapPeriod);
+  const d = market.as_of.split('-');
+  document.getElementById('map-note').textContent =
+    `${market.name} 시가총액 상위 ${market.items.length}종목 · 상자 크기 = 시가총액 비중 · ${+d[1]}월 ${+d[2]}일 종가`;
+  const sc = document.getElementById('map-scale');
+  sc.replaceChildren();
+  const S = MAP_SCALE[state.mapPeriod];
+  for (const v of [-S, -S / 2, 0, S / 2, S]) {
+    const c = heatColor(v || null, state.mapPeriod);
+    const i = el('i', null, `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmtNum(Math.abs(v), S < 5 ? 1 : 0)}%`);
+    i.style.background = c.bg; i.style.color = c.ink;
+    sc.appendChild(i);
+  }
+  mapSide(market, state.mapPeriod);
+}
+
+document.getElementById('map-period').addEventListener('click', e => {
+  const b = e.target.closest('button[data-period]');
+  if (!b) return;
+  state.mapPeriod = b.dataset.period;
+  for (const x of document.querySelectorAll('#map-period button')) x.setAttribute('aria-checked', String(x === b));
+  renderMap();
+});
+
+async function loadMarkets() {
+  try {
+    const r = await fetch(`${DATA}/breakdown/markets.json`, { cache: 'no-cache' });
+    if (!r.ok) return;
+    state.markets = await r.json();
+    try { state.market = localStorage.getItem('market'); } catch {}
+    renderMap();
+  } catch {}
+}
+
+// ── 검색 ───────────────────────────────────────────────
+const searchDlg = document.getElementById('search');
+const searchInput = document.getElementById('search-input');
+const searchList = document.getElementById('search-results');
+let searchSel = 0;
+function renderSearch() {
+  const q = searchInput.value.trim().toLowerCase().replace(/\s+/g, '');
+  const groupName = Object.fromEntries(state.groups.map(g => [g.id, g.name]));
+  const hits = [...state.defs.values()].filter(d => state.items.get(d.id)?.last).filter(d => {
+    if (!q) return true;
+    const hay = `${d.name}${d.id}${groupName[d.group]}${d.news || ''}`.toLowerCase().replace(/\s+/g, '');
+    return hay.includes(q);
+  }).slice(0, 30);
+  searchSel = Math.min(searchSel, Math.max(hits.length - 1, 0));
+  searchList.replaceChildren();
+  hits.forEach((d, i) => {
+    const item = state.items.get(d.id);
+    const li = el('li', 'sr');
+    li.setAttribute('role', 'option');
+    li.setAttribute('aria-selected', String(i === searchSel));
+    li.dataset.id = d.id;
+    const mid = el('span', 'sr-mid');
+    mid.append(el('span', 'sr-name', d.name), el('span', 'sr-group', groupName[d.group]));
+    const right = el('span', 'sr-right');
+    right.append(valueNode(d, item.last.value, 'sr-val'), pill(d, item.changes.prev));
+    li.append(avatar(d), mid, right);
+    li.addEventListener('click', () => { searchDlg.close(); openDetail(d.id); });
+    li.addEventListener('pointermove', () => { if (searchSel !== i) { searchSel = i; renderSearch(); } });
+    searchList.appendChild(li);
+  });
+  if (!hits.length) searchList.appendChild(el('li', 'sr-empty', '찾는 지표가 없습니다.'));
+}
+function openSearch() {
+  searchInput.value = '';
+  searchSel = 0;
+  renderSearch();
+  searchDlg.showModal();
+  searchInput.focus();
+}
+document.getElementById('search-open').addEventListener('click', openSearch);
+searchInput.addEventListener('input', () => { searchSel = 0; renderSearch(); });
+searchInput.addEventListener('keydown', e => {
+  const n = searchList.querySelectorAll('.sr').length;
+  if (e.key === 'ArrowDown') { searchSel = Math.min(n - 1, searchSel + 1); renderSearch(); e.preventDefault(); }
+  if (e.key === 'ArrowUp') { searchSel = Math.max(0, searchSel - 1); renderSearch(); e.preventDefault(); }
+  if (e.key === 'Enter') {
+    const li = searchList.querySelectorAll('.sr')[searchSel];
+    // 같은 Enter가 새로 열린 상세 창의 닫기 버튼을 누르지 않도록 다음 틱에 엽니다
+    e.preventDefault();
+    if (li) { searchDlg.close(); setTimeout(() => openDetail(li.dataset.id)); }
+  }
+});
+searchDlg.addEventListener('click', e => { if (e.target === searchDlg) searchDlg.close(); });
+addEventListener('keydown', e => {
+  if ((e.key === '/' || (e.key === 'k' && (e.metaKey || e.ctrlKey))) && !e.target.closest('input, textarea') && !document.querySelector('dialog[open]')) {
+    e.preventDefault();
+    openSearch();
+  }
 });
 
 // ── 오늘의 브리핑 ───────────────────────────────────────
@@ -251,10 +544,10 @@ async function renderBriefing() {
     btn.setAttribute('aria-label', ariaFor(def, item));
     btn.addEventListener('click', () => openDetail(s.id));
     const top = el('span', 'st-top');
-    top.append(el('span', 'st-name', def.name), ...badges(def, item).filter(x => x.classList.contains('hot')));
+    top.append(avatar(def), el('span', 'st-name', def.name), ...badges(def, item).filter(x => x.classList.contains('hot')));
     const mid = el('span', 'st-mid');
     mid.append(valueNode(def, item.last.value, 'st-val'), pill(def, item.changes.prev));
-    btn.append(top, mid, spark(item, { width: 240, height: 44, area: true }));
+    btn.append(top, mid, spark(item, { width: 280, height: 64, area: true }));
     li.appendChild(btn);
     const ctx = s.text.split(' · ').slice(1).join(', ').split(', ').filter(Boolean);
     if (ctx.length) {
@@ -272,6 +565,7 @@ async function renderBriefing() {
         p.appendChild(a);
       } else p.append(h.title);
       if (h.source) p.appendChild(el('span', 'src', h.source));
+      if (s.headlines.length > 1) p.appendChild(el('span', 'src', ` 외 ${s.headlines.length - 1}건`));
       li.appendChild(p);
     }
     list.appendChild(li);
@@ -361,7 +655,7 @@ function headlineList(ev, { links = false } = {}) {
 
 const RANGE_DAYS = { '3m': 92, '1y': 366, '3y': 3 * 366, '10y': 10 * 366, all: Infinity };
 
-async function openDetail(id) {
+async function openDetail(id, { focus } = {}) {
   const def = state.defs.get(id), item = state.items.get(id);
   const dlg = document.getElementById('detail');
   state.detail = id;
@@ -376,9 +670,14 @@ async function openDetail(id) {
   if (def.freq !== 'daily' && def.freq !== 'weekly' && state.range === '3m') setRange('1y');
   const chartBox = document.getElementById('detail-chart');
   chartBox.textContent = '불러오는 중…';
+  document.getElementById('detail-breakdown').hidden = true;
+  document.getElementById('detail-stats').replaceChildren();
   try {
     const [s] = await Promise.all([loadSeries(id), loadNotes(id)]);
     if (state.detail === id) drawDetail(def, s);
+    renderStats(def, s);
+    await renderBreakdown(def);
+    if (focus === 'breakdown' && state.detail === id) document.getElementById('detail-breakdown').scrollIntoView({ block: 'start' });
   } catch {
     chartBox.textContent = '시계열을 불러오지 못했습니다.';
   }
@@ -441,6 +740,7 @@ function drawDetail(def, s) {
     formatY: v => (def.unit === '$' ? '$' : '') + fmtValue(def, v) + (def.unit === '%' || def.unit === '%p' ? '%' : ''),
     xTicks: timeTicks,
     zeroLine: vals.some(v => v < 0) && vals.some(v => v > 0),
+    extremes: true,
   });
 
   const legend = document.getElementById('detail-legend');
@@ -496,6 +796,113 @@ function drawDetail(def, s) {
   }
 }
 
+// 요약 숫자: 기간별 변화와 52주 범위
+function renderStats(def, s) {
+  const box = document.getElementById('detail-stats');
+  box.replaceChildren();
+  const item = state.items.get(def.id);
+  for (const k of ['w1', 'm1', 'ytd', 'y1']) {
+    if (SKIP[def.freq].includes(k) || !item.changes[k]) continue;
+    const c = el('div', 'stat');
+    c.append(el('span', 'muted', `${PERIOD_LABEL[k]}${k === 'ytd' ? '' : ' 전'} 대비`), pill(def, item.changes[k]));
+    box.appendChild(c);
+  }
+  const lastT = parseDate(s.dates[s.dates.length - 1]).getTime();
+  const yr = s.values.filter((v, i) => parseDate(s.dates[i]).getTime() >= lastT - 366 * 864e5);
+  if (yr.length > 3) {
+    const lo = Math.min(...yr), hi = Math.max(...yr), v = item.last.value;
+    const c = el('div', 'stat range52');
+    const bar = el('span', 'r52');
+    const dot = el('i');
+    dot.style.left = `${hi > lo ? ((v - lo) / (hi - lo)) * 100 : 50}%`;
+    bar.appendChild(dot);
+    const lab = el('span', 'r52-lab');
+    lab.append(el('span', null, withUnit(def, lo)), el('span', null, withUnit(def, hi)));
+    c.append(el('span', 'muted', '1년 범위'), bar, lab);
+    box.appendChild(c);
+  }
+}
+
+// 분해 차트 (breakdown/<id>.json) 와 지수 구성종목 지도
+const PART_COLORS = ['--series-1', '--series-2', '--series-3', '--series-4', '--series-5'];
+const breakdownCache = new Map();
+async function renderBreakdown(def) {
+  const box = document.getElementById('detail-breakdown');
+  box.replaceChildren();
+  box.hidden = true;
+  const market = state.markets?.markets?.find(m => m.id === def.id);
+  if (market) {
+    box.appendChild(el('h3', null, `${market.name} 구성종목 지도`));
+    box.appendChild(el('p', 'muted small', `시가총액 상위 ${market.items.length}종목 · 상자 크기 = 비중 · 색 = ${FREQ_PREV.daily} 대비 등락`));
+    const tm = el('div', 'treemap small');
+    box.appendChild(tm);
+    box.hidden = false;
+    drawTreemap(tm, market, 'prev', { compact: true });
+    return;
+  }
+  if (!state.breakdowns.has(def.id)) return;
+  let data = breakdownCache.get(def.id);
+  if (!data) {
+    try {
+      const r = await fetch(`${DATA}/breakdown/${def.id}.json`);
+      if (!r.ok) return;
+      data = await r.json();
+      breakdownCache.set(def.id, data);
+    } catch { return; }
+  }
+  if (state.detail !== def.id) return;
+  box.appendChild(el('h3', null, data.title));
+  box.hidden = false;
+  for (const c of data.charts) {
+    const wrap = el('div', 'bd-chart');
+    wrap.appendChild(el('h4', null, c.title));
+    const legend = el('div', 'legend');
+    const parts = c.parts.map((p, i) => ({ ...p, color: cssVar(PART_COLORS[i]) }));
+    for (const p of parts) {
+      const sp = el('span');
+      const k = el('i'); k.style.background = p.color;
+      sp.append(k, p.name);
+      legend.appendChild(sp);
+    }
+    const tl = el('span');
+    const tk = el('i'); tk.style.background = cssVar('--ink');
+    tl.append(tk, c.total.name);
+    legend.appendChild(tl);
+    const chart = el('div', 'chart bd');
+    wrap.append(legend, chart, el('p', 'muted small', c.note));
+    box.appendChild(wrap);
+    const unit = c.unit === '%p' ? '%p' : '%';
+    const fy = v => `${fmtNum(v, 1)}${unit}`;
+    if (c.kind === 'stack') {
+      const n = Math.min(c.dates.length, def.freq === 'quarterly' ? 24 : 48);
+      const sl = a => a.slice(-n);
+      const dates = sl(c.dates);
+      stackChart(chart, {
+        labels: dates,
+        parts: parts.map(p => ({ ...p, values: sl(p.values) })),
+        total: { name: c.total.name, values: sl(c.total.values) },
+        formatX: (i, short) => {
+          const d = parseDate(dates[i]);
+          if (def.freq === 'quarterly') return short ? `${String(d.getFullYear()).slice(2)}Q${Math.floor(d.getMonth() / 3) + 1}` : `${d.getFullYear()}년 ${Math.floor(d.getMonth() / 3) + 1}분기`;
+          return short ? `${String(d.getFullYear()).slice(2)}.${d.getMonth() + 1}` : `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
+        },
+        formatY: fy,
+      });
+    } else {
+      const xs = c.dates.map(d => parseDate(d).getTime());
+      lineChart(chart, {
+        xs,
+        series: [{ name: c.total.name, color: cssVar('--ink'), values: c.total.values },
+          ...parts.map(p => ({ name: p.name, color: p.color, values: p.values }))],
+        formatX: (_, i) => fmtDate({ freq: 'daily' }, c.dates[i]),
+        formatY: v => `${fmtNum(v, 2)}%`,
+        xTicks: timeTicks,
+        zeroLine: parts.some(p => p.values.some(v => v < 0)),
+      });
+    }
+  }
+}
+
 function setRange(range) {
   state.range = range;
   for (const b of document.querySelectorAll('#ranges button')) b.setAttribute('aria-checked', String(b.dataset.range === range));
@@ -514,6 +921,8 @@ document.getElementById('detail').addEventListener('close', () => { state.detail
 let latestCurve = null;
 function rerenderCharts() {
   renderCurve(latestCurve);
+  renderMap();
+  if (state.detail) renderBreakdown(state.defs.get(state.detail));
   if (state.detail) loadSeries(state.detail).then(s => state.detail && drawDetail(state.defs.get(state.detail), s));
 }
 let resizeTimer;
@@ -551,15 +960,22 @@ async function main() {
   if (stale || missing) msgs.push(`${stale + missing}개 지표는 이번에 새로 받지 못해 이전 데이터로 표시합니다.`);
   if (msgs.length) { notice.textContent = msgs.join(' '); notice.hidden = false; }
 
-  let saved = null;
-  try { saved = localStorage.getItem('tab'); } catch {}
-  state.tab = state.groups.some(g => g.id === saved) ? saved : state.groups[0]?.id;
+  try {
+    const r = await fetch(`${DATA}/breakdown/index.json`, { cache: 'no-cache' });
+    if (r.ok) state.breakdowns = new Set(await r.json());
+  } catch {}
   renderTabs();
   renderGroups();
   renderKeys();
   renderBriefing();
+  loadMarkets();
   latestCurve = latest.curve;
   renderCurve(latestCurve);
+  const more = document.getElementById('curve-more');
+  if (state.breakdowns.has('ust10y') && state.items.has('ust10y')) {
+    more.hidden = false;
+    more.addEventListener('click', () => openDetail('ust10y', { focus: 'breakdown' }));
+  }
 }
 
 main().catch(err => {

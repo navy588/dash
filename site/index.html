@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>글로벌 경제 데일리</title>
-  <meta name="description" content="주가지수·환율·금리·원자재·미국 거시지표를 매일 자동으로 모아 무엇이 왜 움직였는지 보여 주는 대시보드">
-  <meta name="theme-color" content="#f2f4f6" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#101114" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="주가지수·환율·금리·원자재·한미 경제지표를 매일 자동으로 모아 무엇이 왜 움직였는지 보여 주는 대시보드">
+  <meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e0f12" media="(prefers-color-scheme: dark)">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%233182f6'/%3E%3Cpath d='M7 21l6-6 4 3 8-9' stroke='%23fff' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" href="style.css">
@@ -16,31 +16,58 @@
   <header class="top">
     <div class="wrap top-inner">
       <a class="brand" href="./">
-        <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32" width="28" height="28"><rect width="32" height="32" rx="9" fill="currentColor"/><path d="M7 21l6-6 4 3 8-9" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-        <span>
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32" width="30" height="30"><rect width="32" height="32" rx="9" fill="currentColor"/><path d="M7 21l6-6 4 3 8-9" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="brand-text">
           <h1>글로벌 경제 데일리</h1>
           <span class="updated" id="updated">불러오는 중…</span>
         </span>
       </a>
-      <button class="icon-btn" id="theme-toggle" type="button" aria-label="밝은 화면과 어두운 화면 전환"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="currentColor"/></svg></button>
+      <div class="top-actions">
+        <button class="search-btn" id="search-open" type="button" aria-label="지표 검색">
+          <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2.2" fill="none"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          <span class="search-label">지표 검색</span><kbd>/</kbd>
+        </button>
+        <button class="icon-btn" id="theme-toggle" type="button" aria-label="밝은 화면과 어두운 화면 전환"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="currentColor"/></svg></button>
+      </div>
     </div>
   </header>
 
   <main class="wrap" id="main">
     <div class="notice" id="notice" hidden></div>
 
-    <section class="card today" id="briefing-block" aria-labelledby="briefing-headline" hidden>
-      <div class="today-head">
-        <p class="eyebrow"><span id="briefing-asof"></span><span class="mood" id="briefing-mood" hidden></span></p>
-        <h2 class="headline" id="briefing-headline"></h2>
-        <ul class="reads" id="briefing-reads"></ul>
-      </div>
+    <section class="hero" id="briefing-block" aria-labelledby="briefing-headline" hidden>
+      <p class="eyebrow"><span id="briefing-asof"></span><span class="mood" id="briefing-mood" hidden></span></p>
+      <h2 class="headline" id="briefing-headline"></h2>
+      <ul class="reads" id="briefing-reads"></ul>
       <ol class="stories" id="briefing-list"></ol>
     </section>
 
     <section class="section" aria-labelledby="keys-title">
-      <div class="section-head"><h2 id="keys-title">주요 지표</h2></div>
+      <div class="section-head"><h2 id="keys-title">주요 지표</h2><span class="hint-inline">최근 3개월 흐름</span></div>
       <div class="keys" id="keys"></div>
+    </section>
+
+    <section class="section" id="map-section" aria-labelledby="map-title" hidden>
+      <div class="section-head">
+        <h2 id="map-title">시장 지도</h2>
+        <div class="head-ctrls">
+          <div class="seg" role="radiogroup" aria-label="시장" id="map-market"></div>
+          <div class="seg" role="radiogroup" aria-label="등락 기간" id="map-period">
+            <button type="button" role="radio" data-period="prev" aria-checked="true">하루</button>
+            <button type="button" role="radio" data-period="w1" aria-checked="false">1주</button>
+            <button type="button" role="radio" data-period="m1" aria-checked="false">1개월</button>
+            <button type="button" role="radio" data-period="ytd" aria-checked="false">연초</button>
+            <button type="button" role="radio" data-period="y1" aria-checked="false">1년</button>
+          </div>
+        </div>
+      </div>
+      <div class="map-layout">
+        <div class="card map-card">
+          <div class="treemap" id="map"></div>
+          <div class="map-foot"><span id="map-note"></span><span class="scale" id="map-scale"></span></div>
+        </div>
+        <aside class="card map-side" id="map-side"></aside>
+      </div>
     </section>
 
     <div class="cols">
@@ -55,8 +82,8 @@
             <button type="button" role="radio" data-period="y1" aria-checked="false">1년</button>
           </div>
         </div>
-        <div class="tabs" role="tablist" aria-label="분야" id="tabs"></div>
-        <div class="card list" id="groups" role="tabpanel"></div>
+        <nav class="tabs" aria-label="분야 바로가기" id="tabs"></nav>
+        <div id="groups"></div>
       </section>
 
       <aside class="side">
@@ -69,6 +96,7 @@
           <p class="hint">짧은 만기가 긴 만기보다 높으면(역전) 경기 둔화 신호로 봅니다.</p>
           <div class="legend" id="curve-legend"></div>
           <div class="chart curve-chart" id="curve-chart"></div>
+          <button type="button" class="link-btn" id="curve-more" hidden>10년물 금리 분해 보기 →</button>
         </section>
       </aside>
     </div>
@@ -89,6 +117,7 @@
       </div>
       <button type="button" class="icon-btn" id="detail-close" aria-label="닫기"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button>
     </div>
+    <div class="stats" id="detail-stats"></div>
     <div class="legend detail-legend" id="detail-legend"></div>
     <div class="chart detail-chart" id="detail-chart"></div>
     <div class="seg ranges" role="radiogroup" aria-label="차트 기간" id="ranges">
@@ -98,11 +127,21 @@
       <button type="button" role="radio" data-range="10y" aria-checked="false">10년</button>
       <button type="button" role="radio" data-range="all" aria-checked="false">전체</button>
     </div>
+    <div class="breakdown" id="detail-breakdown" hidden></div>
     <div class="events" id="detail-events" hidden></div>
     <details class="table-view">
       <summary>표로 보기</summary>
       <div class="table-scroll"><table id="detail-table"></table></div>
     </details>
+  </dialog>
+
+  <dialog id="search" aria-label="지표 검색">
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2.2" fill="none"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <input id="search-input" type="search" placeholder="지표 이름 (예: 코스피, 금리, CPI)" autocomplete="off" aria-controls="search-results">
+      <kbd>esc</kbd>
+    </div>
+    <ul class="search-results" id="search-results" role="listbox"></ul>
   </dialog>
 
   <noscript><p class="wrap">이 페이지는 자바스크립트가 필요합니다.</p></noscript>

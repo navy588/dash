@@ -31,8 +31,8 @@ def fetch_bea(session):
     return parse_bea(r.text)
 
 
-def parse_bea(html):
-    """[(date, 제목)]. 날짜 칸은 "October 29" 꼴이고 연도는 표 위 "Year 2026" 제목에서 가져옵니다."""
+def parse_bea(html, today=None):
+    """[(date, 제목)]. 날짜 칸은 "October 29" 꼴이고, 연도가 없으면 오늘 기준으로 정합니다."""
     out = []
     pos_years = [(m.start(), int(m.group(1))) for m in re.finditer(r"Year\s+(20\d\d)", html)]
     for m in re.finditer(r"<tr[^>]*>(.*?)</tr>", html, re.S):
@@ -49,9 +49,9 @@ def parse_bea(html):
         if year is None:
             prev = [y for p, y in pos_years if p < m.start()]
             year = prev[-1] if prev else None
-        if year is None:
-            q = re.search(r"Quarter (20\d\d)|, (20\d\d)\b", title)
-            year = int(next(g for g in q.groups() if g)) if q else datetime.now().year
+        if year is None:  # 일정표는 앞으로의 날짜이므로 이미 지난 달이면 내년
+            now = today or date.today()
+            year = now.year + (1 if MONTHS[d.group(1)] < now.month - 1 else 0)
         out.append((date(year, MONTHS[d.group(1)], int(d.group(2))), title))
     return sorted(set(out))
 

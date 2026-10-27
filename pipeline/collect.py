@@ -94,10 +94,16 @@ def fetch_yahoo(codes):
 def fetch_lme(code, session=None):
     """LME 현금 결제가(일별, $/t)를 westmetall.com 표에서 읽습니다. code 예: LME_Cu_cash"""
     session = session or _session()
-    r = session.get("https://www.westmetall.com/en/markdaten.php", timeout=HTTP_TIMEOUT,
-                    params={"action": "table", "field": code})
-    r.raise_for_status()
-    return parse_lme_html(r.text)
+    err = None
+    # www 주소는 GitHub 실행기에서 접속이 막힐 때가 있어 다른 주소로도 시도
+    for base in ("https://westmetall.com", "https://www.westmetall.com", "http://www.westmetall.com"):
+        try:
+            r = session.get(f"{base}/en/markdaten.php", timeout=HTTP_TIMEOUT, params={"action": "table", "field": code})
+            r.raise_for_status()
+            return parse_lme_html(r.text)
+        except Exception as e:  # noqa: BLE001
+            err = e
+    raise err
 
 
 def parse_lme_html(html):

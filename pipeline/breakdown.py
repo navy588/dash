@@ -190,7 +190,7 @@ def component_frames(fetch_fred, log=print):
 
 def _weekly(df):
     """일별 자료는 화면 부담을 줄이려 주간(금요일)으로."""
-    return df.resample("W-FRI").last().dropna(how="all")
+    return df.groupby(df.index.to_period("W-FRI")).tail(1)
 
 
 def build_stacks(frames):

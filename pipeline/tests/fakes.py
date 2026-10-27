@@ -15,11 +15,15 @@ def monthly(start="1999-01-01", end="2026-09-01", base=100.0):
 
 
 def fake_fred(code, key=None, session=None):
-    if code in ("CPIAUCSL", "CPILFESL", "PCEPILFE", "PAYEMS"):
+    if code in ("CPIAUCSL", "CPILFESL", "PCEPILFE", "PAYEMS", "XTEXVA01KRM667S",
+                "CPIUFDSL", "CPIENGSL", "CUSR0000SACL1E", "CUSR0000SAH1", "CUSR0000SASLE"):
         return monthly()
-    if code in ("UNRATE",):
+    if code in ("UNRATE", "LRHUTTTTKRM156S"):
         return monthly() / 25
-    if code == "A191RL1Q225SBEA":
+    if code.endswith("Q224SBEA"):  # GDP 기여도
+        idx = pd.date_range("2015-01-01", "2026-04-01", freq="QS")
+        return pd.Series(np.sin(np.arange(len(idx)) + len(code)), index=idx)
+    if code in ("A191RL1Q225SBEA", "NAEXKP01KRQ657S"):
         return pd.Series([2.0, 3.1, 1.4], index=pd.to_datetime(["2025-10-01", "2026-01-01", "2026-04-01"]))
     if code == "GDPNOW":
         return pd.Series([3.0, 1.6, 2.4], index=pd.to_datetime(["2026-01-01", "2026-04-01", "2026-07-01"]))
@@ -36,9 +40,9 @@ def fake_lme(code, session=None):
     return daily(base=10000.0, seed=len(code) + 7)
 
 
-def fake_news(query, date, session=None):
-    return [{"title": f"{query} 관련 뉴스 {date:%m/%d} #{k}", "url": f"https://example.com/{k}",
-             "source": "테스트일보", "published": date.strftime("%Y-%m-%d")} for k in range(1, 3)]
+def fake_news(query, start, end, session=None):
+    return [{"title": f"{query} 관련 뉴스 {start:%m/%d} #{k}", "url": f"https://example.com/{k}",
+             "source": "테스트일보", "published": start.strftime("%Y-%m-%d")} for k in range(1, 3)]
 
 
 def fake_bis(code, session=None):
@@ -51,3 +55,11 @@ D,KR,2026-10-21,2.5
 D,KR,2026-10-22,2.5
 D,KR,2026-10-23,
 """
+
+
+def fake_prices(tickers):
+    return {t: daily(start="2025-09-01", base=50.0 + i, seed=i + 3) for i, t in enumerate(tickers)}
+
+
+def fake_caps(tickers):
+    return {t: 1e9 * (len(tickers) - i) ** 1.5 for i, t in enumerate(tickers)}

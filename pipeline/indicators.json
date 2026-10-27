@@ -2,11 +2,19 @@
  "groups": [
   {
    "id": "macro",
-   "name": "미국 거시지표"
+   "name": "미국 경제"
+  },
+  {
+   "id": "krmacro",
+   "name": "한국 경제"
+  },
+  {
+   "id": "commodity",
+   "name": "원자재·코인"
   },
   {
    "id": "korea",
-   "name": "한국"
+   "name": "한국 주식"
   },
   {
    "id": "us",
@@ -23,10 +31,6 @@
   {
    "id": "rates",
    "name": "금리"
-  },
-  {
-   "id": "commodity",
-   "name": "원자재·코인"
   }
  ],
  "indicators": [
@@ -40,7 +44,10 @@
    "unit": "%",
    "decimals": 1,
    "change": "pp",
-   "transform": "yoy"
+   "transform": "yoy",
+   "news": "미국 소비자물가 CPI",
+   "match": [["미국", "美", "연준", "Fed", "FOMC", "파월", "뉴욕", "월가"], ["소비자물가", "CPI"]],
+   "exclude": ["한국", "국내", "韓", "중국", "中", "일본", "日", "유로존", "유럽", "영국", "독일", "캐나다", "호주", "인도", "베트남", "대만"]
   },
   {
    "id": "corecpi",
@@ -52,7 +59,10 @@
    "unit": "%",
    "decimals": 1,
    "change": "pp",
-   "transform": "yoy"
+   "transform": "yoy",
+   "news": "미국 근원 소비자물가",
+   "match": [["미국", "美", "연준", "Fed", "FOMC", "파월", "뉴욕", "월가"], ["근원"], ["소비자물가", "CPI", "물가"]],
+   "exclude": ["한국", "국내", "韓", "중국", "中", "일본", "日", "유로존", "유럽", "영국", "독일", "캐나다", "호주", "인도", "베트남", "대만"]
   },
   {
    "id": "corepce",
@@ -68,7 +78,10 @@
    "forecast": {
     "code": "JCXFEMD",
     "label": "FOMC 전망 중간값(4분기 전년비)"
-   }
+   },
+   "news": "미국 PCE 물가",
+   "match": [["미국", "美", "연준", "Fed", "FOMC", "파월", "뉴욕", "월가"], ["PCE", "개인소비지출"]],
+   "exclude": ["한국", "국내", "韓", "중국", "中", "일본", "日", "유로존", "유럽", "영국", "독일", "캐나다", "호주", "인도", "베트남", "대만"]
   },
   {
    "id": "breakeven5y",
@@ -80,7 +93,9 @@
    "unit": "%",
    "decimals": 2,
    "change": "bp",
-   "news": "미국 기대인플레이션"
+   "news": "미국 기대인플레이션",
+   "match": [["미국", "美", "연준", "Fed", "FOMC", "파월", "뉴욕", "월가"], ["기대인플레", "기대 인플레", "BEI"]],
+   "exclude": ["한국", "국내", "韓", "중국", "中", "일본", "日", "유로존", "유럽", "영국", "독일", "캐나다", "호주", "인도", "베트남", "대만"]
   },
   {
    "id": "unrate",
@@ -95,7 +110,10 @@
    "forecast": {
     "code": "UNRATEMD",
     "label": "FOMC 전망 중간값(4분기)"
-   }
+   },
+   "news": "미국 실업률",
+   "match": [["미국", "美", "연준", "Fed", "FOMC", "파월", "뉴욕", "월가"], ["실업률"]],
+   "exclude": ["한국", "국내", "韓", "중국", "中", "일본", "日", "유로존", "유럽", "영국", "독일", "캐나다", "호주", "인도", "베트남", "대만"]
   },
   {
    "id": "payrolls",
@@ -107,7 +125,10 @@
    "unit": "천 명",
    "decimals": 0,
    "change": "abs",
-   "transform": "diff"
+   "transform": "diff",
+   "news": "미국 비농업 고용",
+   "match": [["미국", "美", "연준", "Fed", "FOMC", "파월", "뉴욕", "월가"], ["고용", "일자리", "비농업"]],
+   "exclude": ["한국", "국내", "韓", "중국", "中", "일본", "日", "유로존", "유럽", "영국", "독일", "캐나다", "호주", "인도", "베트남", "대만"]
   },
   {
    "id": "claims",
@@ -119,7 +140,9 @@
    "unit": "건",
    "decimals": 0,
    "change": "pct",
-   "news": "미국 실업수당 청구"
+   "news": "미국 실업수당 청구",
+   "match": [["미국", "美", "연준", "Fed", "FOMC", "파월", "뉴욕", "월가"], ["실업수당"]],
+   "exclude": ["한국", "국내", "韓", "중국", "中", "일본", "日", "유로존", "유럽", "영국", "독일", "캐나다", "호주", "인도", "베트남", "대만"]
   },
   {
    "id": "gdp",
@@ -134,7 +157,10 @@
    "forecast": {
     "code": "GDPNOW",
     "label": "애틀랜타 연은 GDPNow(이번 분기)"
-   }
+   },
+   "news": "미국 GDP 성장률",
+   "match": [["미국", "美", "연준", "Fed", "FOMC", "파월", "뉴욕", "월가"], ["GDP", "성장률"]],
+   "exclude": ["한국", "국내", "韓", "중국", "中", "일본", "日", "유로존", "유럽", "영국", "독일", "캐나다", "호주", "인도", "베트남", "대만"]
   },
   {
    "id": "gdpnow",
@@ -145,7 +171,225 @@
    "freq": "quarterly",
    "unit": "%",
    "decimals": 1,
-   "change": "pp"
+   "change": "pp",
+   "news": "애틀랜타 연은 GDPNow",
+   "match": [["GDPNow", "GDP나우", "애틀랜타"]]
+  },
+  {
+   "id": "krcpi",
+   "name": "소비자물가 상승률",
+   "group": "krmacro",
+   "source": "bis",
+   "code": "WS_LONG_CPI/M.KR.771",
+   "freq": "monthly",
+   "unit": "%",
+   "decimals": 1,
+   "change": "pp",
+   "news": "한국 소비자물가 상승률",
+   "match": [["한국", "국내", "韓", "통계청", "국가데이터처", "한은", "한국은행", "산업통상", "산업부", "소비자물가"], ["소비자물가", "물가 상승률", "물가상승률"]],
+   "exclude": ["미국", "美", "중국", "中", "일본", "日", "유로존", "영국", "독일"]
+  },
+  {
+   "id": "krunemp",
+   "name": "실업률",
+   "group": "krmacro",
+   "source": "fred",
+   "code": "LRHUTTTTKRM156S",
+   "freq": "monthly",
+   "unit": "%",
+   "decimals": 1,
+   "change": "pp",
+   "news": "한국 실업률 고용동향",
+   "match": [["한국", "국내", "韓", "통계청", "국가데이터처", "한은", "한국은행", "산업통상", "산업부", "고용동향", "취업자"], ["실업률", "고용률", "취업자"]],
+   "exclude": ["미국", "美", "중국", "中", "일본", "日", "유로존", "영국", "독일"]
+  },
+  {
+   "id": "krexports",
+   "name": "수출 증가율",
+   "group": "krmacro",
+   "source": "fred",
+   "code": "XTEXVA01KRM667S",
+   "freq": "monthly",
+   "unit": "%",
+   "decimals": 1,
+   "change": "pp",
+   "transform": "yoy",
+   "news": "한국 수출 증가율",
+   "match": [["한국", "국내", "韓", "통계청", "국가데이터처", "한은", "한국은행", "산업통상", "산업부", "수출입동향", "무역수지"], ["수출"]],
+   "exclude": ["미국", "美", "중국", "中", "일본", "日", "유로존", "영국", "독일"]
+  },
+  {
+   "id": "krgdp",
+   "name": "실질 GDP 성장률(전기비)",
+   "group": "krmacro",
+   "source": "fred",
+   "code": "NAEXKP01KRQ657S",
+   "freq": "quarterly",
+   "unit": "%",
+   "decimals": 1,
+   "change": "pp",
+   "news": "한국 GDP 성장률 한국은행",
+   "match": [["한국", "국내", "韓", "통계청", "국가데이터처", "한은", "한국은행", "산업통상", "산업부"], ["GDP", "성장률"]],
+   "exclude": ["미국", "美", "중국", "中", "일본", "日", "유로존", "영국", "독일"]
+  },
+  {
+   "id": "wti",
+   "name": "WTI 유가",
+   "group": "commodity",
+   "source": "yahoo",
+   "code": "CL=F",
+   "freq": "daily",
+   "unit": "$",
+   "decimals": 2,
+   "change": "pct",
+   "news": "국제유가 WTI",
+   "match": [["WTI", "유가", "원유"]]
+  },
+  {
+   "id": "ttf",
+   "name": "유럽 천연가스(TTF)",
+   "group": "commodity",
+   "source": "yahoo",
+   "code": "TTF=F",
+   "freq": "daily",
+   "unit": "$/MMBtu",
+   "decimals": 2,
+   "change": "pct",
+   "news": "유럽 천연가스 가격",
+   "fx": "EURUSD=X",
+   "scale": 0.293083,
+   "match": [["TTF", "유럽 천연가스", "유럽 가스", "유럽 가스값", "유럽 LNG"]]
+  },
+  {
+   "id": "ironore",
+   "name": "철광석",
+   "group": "commodity",
+   "source": "yahoo",
+   "code": "TIO=F",
+   "freq": "daily",
+   "unit": "$/t",
+   "decimals": 2,
+   "change": "pct",
+   "news": "철광석 가격",
+   "match": [["철광석"]]
+  },
+  {
+   "id": "copper",
+   "name": "구리(LME)",
+   "group": "commodity",
+   "source": "lme",
+   "code": "LME_Cu_cash",
+   "freq": "daily",
+   "unit": "$/t",
+   "decimals": 0,
+   "change": "pct",
+   "news": "구리 가격 LME",
+   "match": [["구리", "전기동"]]
+  },
+  {
+   "id": "aluminum",
+   "name": "알루미늄(LME)",
+   "group": "commodity",
+   "source": "lme",
+   "code": "LME_Al_cash",
+   "freq": "daily",
+   "unit": "$/t",
+   "decimals": 0,
+   "change": "pct",
+   "news": "알루미늄 가격",
+   "match": [["알루미늄"]]
+  },
+  {
+   "id": "nickel",
+   "name": "니켈(LME)",
+   "group": "commodity",
+   "source": "lme",
+   "code": "LME_Ni_cash",
+   "freq": "daily",
+   "unit": "$/t",
+   "decimals": 0,
+   "change": "pct",
+   "news": "니켈 가격",
+   "match": [["니켈"]]
+  },
+  {
+   "id": "jkm",
+   "name": "아시아 LNG(JKM)",
+   "group": "commodity",
+   "source": "yahoo",
+   "code": "JKM=F",
+   "freq": "daily",
+   "unit": "$/MMBtu",
+   "decimals": 2,
+   "change": "pct",
+   "news": "JKM LNG 가격",
+   "match": [["JKM", "LNG"]]
+  },
+  {
+   "id": "brent",
+   "name": "브렌트유",
+   "group": "commodity",
+   "source": "yahoo",
+   "code": "BZ=F",
+   "freq": "daily",
+   "unit": "$",
+   "decimals": 2,
+   "change": "pct",
+   "news": "브렌트유",
+   "match": [["브렌트", "유가", "원유"]]
+  },
+  {
+   "id": "natgas",
+   "name": "미국 천연가스(HH)",
+   "group": "commodity",
+   "source": "yahoo",
+   "code": "NG=F",
+   "freq": "daily",
+   "unit": "$",
+   "decimals": 3,
+   "change": "pct",
+   "news": "미국 천연가스 가격",
+   "match": [["헨리허브", "미국 천연가스", "美 천연가스", "천연가스 선물", "천연가스 가격"]],
+   "exclude": ["유럽"]
+  },
+  {
+   "id": "gold",
+   "name": "금",
+   "group": "commodity",
+   "source": "yahoo",
+   "code": "GC=F",
+   "freq": "daily",
+   "unit": "$",
+   "decimals": 1,
+   "change": "pct",
+   "news": "금값",
+   "match": [["금값", "금 가격", "금가격", "국제 금", "金", "금 선물", "골드", "금 시세"]]
+  },
+  {
+   "id": "silver",
+   "name": "은",
+   "group": "commodity",
+   "source": "yahoo",
+   "code": "SI=F",
+   "freq": "daily",
+   "unit": "$",
+   "decimals": 2,
+   "change": "pct",
+   "news": "은 가격",
+   "match": [["은값", "은 가격", "은가격", "銀", "실버", "은 선물", "은 시세"]]
+  },
+  {
+   "id": "bitcoin",
+   "name": "비트코인",
+   "group": "commodity",
+   "source": "yahoo",
+   "code": "BTC-USD",
+   "freq": "daily",
+   "unit": "$",
+   "decimals": 0,
+   "change": "pct",
+   "news": "비트코인",
+   "match": [["비트코인", "BTC"]]
   },
   {
    "id": "kospi",
@@ -157,7 +401,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "코스피"
+   "news": "코스피",
+   "match": [["코스피"]]
   },
   {
    "id": "kosdaq",
@@ -169,7 +414,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "코스닥"
+   "news": "코스닥",
+   "match": [["코스닥"]]
   },
   {
    "id": "spx",
@@ -181,7 +427,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "뉴욕증시 S&P500"
+   "news": "뉴욕증시 S&P500",
+   "match": [["S&P", "뉴욕증시", "뉴욕 증시", "美 증시", "미국 증시", "미 증시", "월가"]]
   },
   {
    "id": "nasdaq",
@@ -193,7 +440,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "나스닥 지수"
+   "news": "나스닥 지수",
+   "match": [["나스닥"]]
   },
   {
    "id": "dow",
@@ -205,7 +453,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "다우지수"
+   "news": "다우지수",
+   "match": [["다우"]]
   },
   {
    "id": "sox",
@@ -217,7 +466,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "필라델피아 반도체지수"
+   "news": "필라델피아 반도체지수",
+   "match": [["필라델피아", "반도체지수"]]
   },
   {
    "id": "vix",
@@ -229,7 +479,34 @@
    "unit": "pt",
    "decimals": 2,
    "change": "abs",
-   "news": "VIX 변동성"
+   "news": "VIX 변동성",
+   "match": [["VIX", "변동성지수", "공포지수"]]
+  },
+  {
+   "id": "qld",
+   "name": "QLD (나스닥 2배)",
+   "group": "us",
+   "source": "yahoo",
+   "code": "QLD",
+   "freq": "daily",
+   "unit": "$",
+   "decimals": 2,
+   "change": "pct",
+   "news": "QLD 나스닥 레버리지 ETF",
+   "match": [["QLD", "레버리지", "나스닥"]]
+  },
+  {
+   "id": "tqqq",
+   "name": "TQQQ (나스닥 3배)",
+   "group": "us",
+   "source": "yahoo",
+   "code": "TQQQ",
+   "freq": "daily",
+   "unit": "$",
+   "decimals": 2,
+   "change": "pct",
+   "news": "TQQQ",
+   "match": [["TQQQ", "레버리지", "나스닥"]]
   },
   {
    "id": "nikkei",
@@ -241,7 +518,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "닛케이 지수"
+   "news": "닛케이 지수",
+   "match": [["닛케이", "日 증시", "일본 증시", "도쿄증시", "도쿄 증시"]]
   },
   {
    "id": "shanghai",
@@ -253,7 +531,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "상하이종합지수"
+   "news": "상하이종합지수",
+   "match": [["상하이", "상해", "中 증시", "중국 증시"]]
   },
   {
    "id": "hangseng",
@@ -265,7 +544,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "항셍지수"
+   "news": "항셍지수",
+   "match": [["항셍", "홍콩 증시", "홍콩증시"]]
   },
   {
    "id": "taiex",
@@ -277,7 +557,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "대만 증시"
+   "news": "대만 증시",
+   "match": [["대만"], ["증시", "가권", "지수", "주가"]]
   },
   {
    "id": "stoxx50",
@@ -289,7 +570,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "유럽증시"
+   "news": "유럽증시",
+   "match": [["유럽 증시", "유럽증시", "유로스톡스", "STOXX"]]
   },
   {
    "id": "dax",
@@ -301,7 +583,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "독일 DAX"
+   "news": "독일 DAX",
+   "match": [["DAX", "닥스", "독일 증시", "독일증시"]]
   },
   {
    "id": "ftse",
@@ -313,7 +596,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "영국 FTSE"
+   "news": "영국 FTSE",
+   "match": [["FTSE", "영국 증시", "영국증시"]]
   },
   {
    "id": "usdkrw",
@@ -325,7 +609,9 @@
    "unit": "원",
    "decimals": 1,
    "change": "pct",
-   "news": "원달러 환율"
+   "news": "원달러 환율",
+   "match": [["원/달러", "원·달러", "원달러", "달러·원", "달러-원", "달러/원", "환율"]],
+   "exclude": ["엔화", "원/엔", "원·엔", "위안"]
   },
   {
    "id": "jpykrw",
@@ -338,7 +624,8 @@
    "decimals": 2,
    "change": "pct",
    "scale": 100,
-   "news": "원엔 환율"
+   "news": "원엔 환율",
+   "match": [["원/엔", "원·엔", "원엔", "엔화", "엔저", "엔고"]]
   },
   {
    "id": "dxy",
@@ -350,7 +637,8 @@
    "unit": "pt",
    "decimals": 2,
    "change": "pct",
-   "news": "달러인덱스"
+   "news": "달러인덱스",
+   "match": [["달러인덱스", "달러 인덱스", "달러지수", "달러 지수", "달러화"]]
   },
   {
    "id": "eurusd",
@@ -362,7 +650,8 @@
    "unit": "$",
    "decimals": 4,
    "change": "pct",
-   "news": "유로화 달러"
+   "news": "유로화 달러",
+   "match": [["유로"]]
   },
   {
    "id": "usdjpy",
@@ -374,7 +663,8 @@
    "unit": "엔",
    "decimals": 2,
    "change": "pct",
-   "news": "엔달러 환율"
+   "news": "엔달러 환율",
+   "match": [["엔화", "엔/달러", "엔·달러", "달러/엔", "달러·엔", "엔달러", "엔저", "엔고"]]
   },
   {
    "id": "usdcny",
@@ -386,7 +676,8 @@
    "unit": "위안",
    "decimals": 4,
    "change": "pct",
-   "news": "위안화 환율"
+   "news": "위안화 환율",
+   "match": [["위안"]]
   },
   {
    "id": "gbpusd",
@@ -398,7 +689,8 @@
    "unit": "$",
    "decimals": 4,
    "change": "pct",
-   "news": "파운드화"
+   "news": "파운드화",
+   "match": [["파운드"]]
   },
   {
    "id": "fedfunds",
@@ -414,7 +706,8 @@
     "code": "FEDTARMD",
     "label": "FOMC 점도표 중간값(연말)"
    },
-   "news": "연준 기준금리"
+   "news": "연준 기준금리",
+   "match": [["연준", "Fed", "FOMC", "파월", "미국 기준금리", "美 기준금리", "미 기준금리"]]
   },
   {
    "id": "krbase",
@@ -426,7 +719,8 @@
    "unit": "%",
    "decimals": 2,
    "change": "bp",
-   "news": "한국은행 기준금리"
+   "news": "한국은행 기준금리",
+   "match": [["한국은행", "한은", "금통위", "이창용"]]
   },
   {
    "id": "ust3m",
@@ -438,7 +732,8 @@
    "unit": "%",
    "decimals": 2,
    "change": "bp",
-   "news": "미국 국채 금리"
+   "news": "미국 단기 국채 금리",
+   "match": [["미국", "美", "연준", "Fed", "FOMC", "파월", "뉴욕", "월가", "미 국채", "美 국채"], ["국채", "단기물"]]
   },
   {
    "id": "ust2y",
@@ -450,7 +745,8 @@
    "unit": "%",
    "decimals": 2,
    "change": "bp",
-   "news": "미국 2년물 국채"
+   "news": "미국 2년물 국채",
+   "match": [["미국", "美", "연준", "Fed", "FOMC", "파월", "뉴욕", "월가", "미 국채", "美 국채"], ["국채", "2년물"]]
   },
   {
    "id": "ust10y",
@@ -462,7 +758,8 @@
    "unit": "%",
    "decimals": 2,
    "change": "bp",
-   "news": "미국 10년물 국채 금리"
+   "news": "미국 10년물 국채 금리",
+   "match": [["미국", "美", "연준", "Fed", "FOMC", "파월", "뉴욕", "월가", "미 국채", "美 국채"], ["국채", "10년물"]]
   },
   {
    "id": "ust30y",
@@ -474,7 +771,8 @@
    "unit": "%",
    "decimals": 2,
    "change": "bp",
-   "news": "미국 30년물 국채"
+   "news": "미국 30년물 국채",
+   "match": [["미국", "美", "연준", "Fed", "FOMC", "파월", "뉴욕", "월가", "미 국채", "美 국채"], ["국채", "30년물"]]
   },
   {
    "id": "t10y2y",
@@ -486,7 +784,8 @@
    "unit": "%p",
    "decimals": 2,
    "change": "bp",
-   "news": "미국 장단기 금리차"
+   "news": "미국 장단기 금리차",
+   "match": [["장단기", "금리차", "금리 역전", "역전"]]
   },
   {
    "id": "mortgage30",
@@ -498,141 +797,8 @@
    "unit": "%",
    "decimals": 2,
    "change": "bp",
-   "news": "미국 모기지 금리"
-  },
-  {
-   "id": "wti",
-   "name": "WTI 유가",
-   "group": "commodity",
-   "source": "yahoo",
-   "code": "CL=F",
-   "freq": "daily",
-   "unit": "$",
-   "decimals": 2,
-   "change": "pct",
-   "news": "국제유가 WTI"
-  },
-  {
-   "id": "ttf",
-   "name": "유럽 천연가스(TTF)",
-   "group": "commodity",
-   "source": "yahoo",
-   "code": "TTF=F",
-   "freq": "daily",
-   "unit": "$/MMBtu",
-   "decimals": 2,
-   "change": "pct",
-   "news": "유럽 천연가스 가격",
-   "fx": "EURUSD=X",
-   "scale": 0.293083
-  },
-  {
-   "id": "jkm",
-   "name": "아시아 LNG(JKM)",
-   "group": "commodity",
-   "source": "yahoo",
-   "code": "JKM=F",
-   "freq": "daily",
-   "unit": "$/MMBtu",
-   "decimals": 2,
-   "change": "pct",
-   "news": "JKM LNG 가격"
-  },
-  {
-   "id": "copper",
-   "name": "구리(LME)",
-   "group": "commodity",
-   "source": "lme",
-   "code": "LME_Cu_cash",
-   "freq": "daily",
-   "unit": "$/t",
-   "decimals": 0,
-   "change": "pct",
-   "news": "구리 가격 LME"
-  },
-  {
-   "id": "aluminum",
-   "name": "알루미늄(LME)",
-   "group": "commodity",
-   "source": "lme",
-   "code": "LME_Al_cash",
-   "freq": "daily",
-   "unit": "$/t",
-   "decimals": 0,
-   "change": "pct",
-   "news": "알루미늄 가격"
-  },
-  {
-   "id": "nickel",
-   "name": "니켈(LME)",
-   "group": "commodity",
-   "source": "lme",
-   "code": "LME_Ni_cash",
-   "freq": "daily",
-   "unit": "$/t",
-   "decimals": 0,
-   "change": "pct",
-   "news": "니켈 가격"
-  },
-  {
-   "id": "brent",
-   "name": "브렌트유",
-   "group": "commodity",
-   "source": "yahoo",
-   "code": "BZ=F",
-   "freq": "daily",
-   "unit": "$",
-   "decimals": 2,
-   "change": "pct",
-   "news": "브렌트유"
-  },
-  {
-   "id": "natgas",
-   "name": "미국 천연가스(HH)",
-   "group": "commodity",
-   "source": "yahoo",
-   "code": "NG=F",
-   "freq": "daily",
-   "unit": "$",
-   "decimals": 3,
-   "change": "pct",
-   "news": "미국 천연가스 가격"
-  },
-  {
-   "id": "gold",
-   "name": "금",
-   "group": "commodity",
-   "source": "yahoo",
-   "code": "GC=F",
-   "freq": "daily",
-   "unit": "$",
-   "decimals": 1,
-   "change": "pct",
-   "news": "금값"
-  },
-  {
-   "id": "silver",
-   "name": "은",
-   "group": "commodity",
-   "source": "yahoo",
-   "code": "SI=F",
-   "freq": "daily",
-   "unit": "$",
-   "decimals": 2,
-   "change": "pct",
-   "news": "은 가격"
-  },
-  {
-   "id": "bitcoin",
-   "name": "비트코인",
-   "group": "commodity",
-   "source": "yahoo",
-   "code": "BTC-USD",
-   "freq": "daily",
-   "unit": "$",
-   "decimals": 0,
-   "change": "pct",
-   "news": "비트코인"
+   "news": "미국 모기지 금리",
+   "match": [["모기지"]]
   }
  ],
  "curve": [

@@ -72,6 +72,11 @@ jobs:
         continue-on-error: true   # 브리핑이 실패해도 지표 배포는 계속
         run: python pipeline/briefing.py site/data
 
+      - name: Build breakdowns (market maps, decompositions)
+        continue-on-error: true   # 실패해도 지표 배포는 계속
+        timeout-minutes: 10
+        run: python pipeline/breakdown.py site/data
+
       - name: Render check with collected data (PR)
         if: github.event_name == 'pull_request'
         run: |

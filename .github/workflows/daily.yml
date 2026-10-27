@@ -19,6 +19,7 @@ concurrency:
 
 env:
   PYTHON_VERSION: '3.12'
+  PYTHONWARNINGS: ignore::DeprecationWarning   # yfinance 경고가 로그를 덮지 않도록
 
 jobs:
   test:
@@ -76,6 +77,10 @@ jobs:
         continue-on-error: true   # 실패해도 지표 배포는 계속
         timeout-minutes: 10
         run: python pipeline/breakdown.py site/data
+
+      - name: Summary
+        if: always()
+        run: python pipeline/summary.py site/data | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Render check with collected data (PR)
         if: github.event_name == 'pull_request'

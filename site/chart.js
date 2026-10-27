@@ -248,7 +248,19 @@ export function timeTicks(xs, width) {
 
 
 // 작은 막대 차트 (월별 지표용). 마지막 막대만 진하게.
-export function bars(values, { width = 120, height = 36, color = 'var(--brand)' } = {}) {
+let hatchSeq = 0;
+/** 빗금 채우기(속보치 등 잠정 값 표시용) */
+function hatch(svg, color) {
+  const id = `h${++hatchSeq}`;
+  const defs = el('defs', {}, svg);
+  const p = el('pattern', { id, width: 5, height: 5, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+  el('rect', { width: 5, height: 5, style: `fill:${color};opacity:.18` }, p);
+  el('line', { x1: 0, y1: 0, x2: 0, y2: 5, style: `stroke:${color};stroke-width:2.6` }, p);
+  return `url(#${id})`;
+}
+
+/** 막대 추세선. hatched: 빗금으로 그릴 막대 위치(예: 속보치) */
+export function bars(values, { width = 120, height = 36, color = 'var(--brand)', hatched = [] } = {}) {
   const svg = el('svg', { viewBox: `0 0 ${width} ${height}`, class: 'spark bars', 'aria-hidden': 'true', preserveAspectRatio: 'none' });
   if (!values || !values.length) return svg;
   // 0을 가로지르지 않으면 바닥을 최솟값 근처로 올려 작은 변화도 보이게
@@ -260,10 +272,13 @@ export function bars(values, { width = 120, height = 36, color = 'var(--brand)' 
   const base = cross ? 0 : mn >= 0 ? lo : hi;
   const Y = v => (1 - (v - lo) / span) * (height - 2) + 1;
   const n = values.length, gap = 2, w = (width - gap * (n - 1)) / n;
+  const hfill = hatched.length ? hatch(svg, color) : null;
   values.forEach((v, i) => {
     const y0 = Y(base), y1 = Y(v);
-    el('rect', { x: i * (w + gap), y: Math.min(y0, y1), width: Math.max(w, 1), height: Math.max(Math.abs(y1 - y0), 1.5), rx: Math.min(2, w / 2),
-      style: `fill:${color};opacity:${i === n - 1 ? 1 : 0.32}` }, svg);
+    const h = hatched.includes(i);
+    const r = el('rect', { x: i * (w + gap), y: Math.min(y0, y1), width: Math.max(w, 1), height: Math.max(Math.abs(y1 - y0), 1.5), rx: Math.min(2, w / 2),
+      style: h ? `fill:${hfill};stroke:${color};stroke-width:1.2` : `fill:${color};opacity:${i === n - 1 ? 1 : 0.32}` }, svg);
+    if (h) r.setAttribute('class', 'hatched');
   });
   return svg;
 }

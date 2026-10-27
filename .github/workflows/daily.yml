@@ -78,6 +78,13 @@ jobs:
         timeout-minutes: 10
         run: python pipeline/breakdown.py site/data
 
+      - name: Probe sources (PR, temporary)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python pipeline/probe.py
+
       - name: Summary
         if: always()
         run: python pipeline/summary.py site/data | tee -a "$GITHUB_STEP_SUMMARY"

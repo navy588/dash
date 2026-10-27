@@ -14,6 +14,9 @@ def summarize(data_dir):
     bad = [f"{i['id']}({i['status']})" for i in latest["indicators"] if i["status"] != "ok"]
     lines.append(f"지표 {len(latest['indicators'])}개 · 정상 {latest['counts'].get('ok')} · 문제 {', '.join(bad) or '없음'}")
     for i in latest["indicators"]:
+        if i["status"] != "ok":
+            lines.append(f"  실패 이유 {i['id']}: {str(i.get('error'))[:200]}")
+    for i in latest["indicators"]:
         if i.get("last"):
             lines.append(f"  {i['id']}: {i['last']['date']} {i['last']['value']:.4g}")
     notes = list((d / "notes").glob("*.json")) if (d / "notes").exists() else []

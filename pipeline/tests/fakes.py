@@ -46,6 +46,8 @@ def fake_news(query, start, end, session=None):
 
 
 def fake_bis(code, session=None):
+    if code.startswith("WS_LONG_CPI"):  # 월별 물가 상승률
+        return monthly(end="2026-07-01") / 40
     idx = pd.bdate_range("2009-01-01", "2026-10-23")
     return pd.Series(np.where(idx < pd.Timestamp("2025-05-29"), 2.75, 2.5), index=idx)
 
@@ -69,3 +71,15 @@ def fake_ecos(code, key=None, session=None, periods=20):
     if "/Q/" in code:
         return pd.Series([0.6, 1.2], index=pd.to_datetime(["2026-04-01", "2026-07-01"]))
     return monthly(start="2024-01-01")
+
+
+def fake_bea():
+    """오늘 기준으로 사흘 뒤 GDP 속보, 다음 달 잠정 발표가 있는 BEA 일정."""
+    from datetime import date, timedelta
+    t = date.today()
+    q = (t.month - 1) // 3  # 지난 분기 번호 (1~4, 0이면 작년 4분기)
+    word = {1: "1st", 2: "2nd", 3: "3rd", 4: "4th"}[q or 4]
+    y = t.year if q else t.year - 1
+    return [(t + timedelta(days=3), f"GDP (Advance Estimate), {word} Quarter {y}"),
+            (t + timedelta(days=4), "Personal Income and Outlays"),
+            (t + timedelta(days=30), f"GDP (Second Estimate) and Corporate Profits, {word} Quarter {y}")]

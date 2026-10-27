@@ -56,6 +56,7 @@ jobs:
         id: collect
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}   # 선택. 없으면 키 없는 CSV 경로 사용
+          ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}   # 선택. 없으면 한국은행 공개 시험용 키
           PREVIOUS_DATA_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data
         run: |
           python pipeline/collect.py --out site/data
@@ -77,13 +78,6 @@ jobs:
         continue-on-error: true   # 실패해도 지표 배포는 계속
         timeout-minutes: 10
         run: python pipeline/breakdown.py site/data
-
-      - name: Probe sources (PR, temporary)
-        if: github.event_name == 'pull_request'
-        continue-on-error: true
-        env:
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: python pipeline/probe.py
 
       - name: Summary
         if: always()

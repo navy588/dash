@@ -149,16 +149,16 @@ def prelim_label(ind, last_date, now, bea=()):
     return None
 
 
-def annotate(registry, latest, prev_latest=None, now=None, session=None, log=print):
+def annotate(registry, latest, prev_latest=None, now=None, session=None, bea=None, log=print):
     """latest.json 지표마다 release·prelim을 채웁니다 (실패해도 조용히 넘어감)."""
     now = now or datetime.now(ZoneInfo("UTC"))
-    bea = []
-    if any("bea" in (i.get("release") or {}) or (i.get("prelim") or {}).get("bea") for i in registry["indicators"]):
+    if bea is None and any("bea" in (i.get("release") or {}) or (i.get("prelim") or {}).get("bea") for i in registry["indicators"]):
         try:
             bea = fetch_bea(session) if session else []
             log(f"BEA 발표 일정: {len(bea)}건")
         except Exception as e:  # noqa: BLE001
             log(f"BEA 발표 일정 실패: {str(e)[:150]}")
+    bea = bea or []
     prev = {i["id"]: i for i in (prev_latest or {}).get("indicators", [])}
     defs = {i["id"]: i for i in registry["indicators"]}
     for item in latest["indicators"]:

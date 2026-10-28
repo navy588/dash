@@ -12,9 +12,13 @@
   카드는 '평소 대비 배수 × 중요도' 순으로 고릅니다(경제 > 원자재 > 시장, `pipeline/briefing.py`의 `IMPORTANCE`).
 - **주요 지표:** 코스피·원/달러·S&P 500·나스닥·미 국채 10년·WTI·금·비트코인. 최근 3개월 흐름과 최고·최저값.
 - **시장 지도:** S&P 500·나스닥 100·코스피·코스닥 시가총액 상위 종목 트리맵. 상자 크기는 시가총액 비중, 색은 등락(하루·1주·1개월·연초·1년).
-  옆에 지수를 끌어올린/끌어내린 종목(비중 × 등락률)과 업종별 가중 등락을 보여 줍니다. 종목 목록은 `pipeline/constituents.json`.
+  옆에 지수의 실제 등락, 지도에 담은 종목만 합친 등락(근사치), 지수를 끌어올린/끌어내린 종목(비중 × 등락률), 업종별 가중 등락을 보여 줍니다.
+  종목 목록은 `pipeline/constituents.json`.
 - **분야별 시세:** 미국 경제, 한국 경제, 원자재·코인, 한국 주식, 미국 주식, 글로벌 주식, 환율, 금리 순서로 한 화면에 이어서 보여 주고,
   위쪽 탭으로 바로 이동합니다. 경제지표는 최근 발표치 막대 카드, 나머지는 추세선이 있는 목록입니다. 직전·1주·1개월·연초·1년 중 기간을 골라 변동률을 봅니다.
+- **발표 일정·속보치:** 월간·분기 경제지표 카드에 다음 발표일을 표시합니다. 미국 GDP·PCE는 미 상무부(BEA) 공식 일정이라 날짜와 D-day를,
+  나머지는 평소 발표 패턴으로 추정해 "11월 중순"처럼 대략 보여 줍니다. 상세 화면에는 이번 발표일(새 값을 처음 받은 날)도 나옵니다.
+  GDP 최근 값이 속보치면 막대를 빗금으로 칠합니다(`pipeline/releases.py`).
 - **원자재 순서:** WTI, 유럽 천연가스(TTF, $/MMBtu), 철광석, 구리, 알루미늄, 니켈(LME), 아시아 LNG(JKM), 브렌트, 미국 천연가스, 금, 은, 비트코인.
 - **상세 화면:** 큰 차트(기간 내 최고·최저 표시), 기간별 변화, 1년 범위, 날짜별 "왜 움직였나" 뉴스, 표 보기.
   지수는 구성종목 지도, 미 국채 10년물은 금리 분해(기대 단기금리 경로 + 기간 프리미엄 · 실질금리 + 기대인플레이션),
@@ -42,7 +46,8 @@ legacy/                    이전 Dash 대시보드 (참고용, 실행되지 않
 ### 자동화 흐름 (`Daily Update` 워크플로)
 
 1. 매일 07:00(미국장 마감 후)과 16:30(한국장 마감 후, 한국시간)에 실행됩니다.
-2. 테스트를 통과하면 FRED, Yahoo Finance, LME(westmetall.com)에서 데이터를 받아 JSON을 만듭니다.
+2. 테스트를 통과하면 FRED, Yahoo Finance, LME(westmetall.com), BIS, 한국은행 ECOS에서 데이터를 받아 JSON을 만듭니다.
+   한국 GDP·물가·수출은 긴 과거는 FRED·BIS에서, 최근 값은 몇 달 빠른 ECOS에서 받아 이어 붙입니다(`indicators.json`의 `recent`).
    이어서 모든 지표의 최근 1년 날짜마다 관련 뉴스를 붙입니다. 오늘 치를 먼저 채우고, 한 번에 400건까지만 검색해
    지난 1년치는 몇 주에 걸쳐 거슬러 올라가며 채워집니다(이미 찾은 날짜는 다시 검색하지 않음).
 3. 받지 못한 지표는 직전 배포본의 데이터를 그대로 쓰고 화면에 "이전 데이터"로 표시합니다.
@@ -59,6 +64,7 @@ PR에서는 테스트와 실제 수집까지만 하고 배포하지 않습니다
 - `data/indicators.json`: 지표 정의 사본
 - `data/notes/<id>.json`: `{ "id", "query", "events": [{ "date", "change", "sigma", "headlines": [{ "title", "url", "source", "published" }] }] }`
 - 전망치가 있는 지표는 `latest.json`의 `forecast: { label, points: [{ date, value }] }`
+- 월간·분기 지표는 `release: { last, next, est }`(est=true면 추정 날짜), 최근 값이 속보치면 `prelim: "속보치"`
 - `data/breakdown/markets.json`: `markets[]`(`id`, `name`, `as_of`, `items[]`: `t` 티커, `n` 이름, `s` 업종, `cap` 시총, `w` 비중%, `price`, `chg.{prev,w1,m1,ytd,y1}`)
 - `data/breakdown/<id>.json`: `charts[]`(`title`, `kind` lines|stack, `dates`, `total`, `parts[]`) / `index.json`: 분해 차트가 있는 지표 id
 - `data/briefing.json`: `as_of`, `headline`, `mood`, `stories[]`(`id`, `big`, `text`, `headlines[]`), `reads[]`, `signals[]`, `stale[]` / `data/briefing.md`: 같은 마크다운
@@ -69,6 +75,7 @@ PR에서는 테스트와 실제 수집까지만 하고 배포하지 않습니다
 그다음 **Actions → Daily Update → Run workflow** 를 한 번 실행하면 위 주소에 페이지가 열립니다.
 
 API 키는 필요 없습니다. FRED 키가 있다면 `FRED_API_KEY` Secret으로 넣을 수 있고, 그러면 공식 API를 씁니다(선택).
+한국은행 ECOS는 공개 시험용 키로 최근 값만 10개씩 나눠 받습니다. 무료 인증키를 `ECOS_API_KEY` Secret으로 넣으면 그 키를 씁니다(선택).
 
 ## 로컬 실행
 

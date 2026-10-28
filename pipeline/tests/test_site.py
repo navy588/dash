@@ -17,7 +17,7 @@ import breakdown  # noqa: E402
 import briefing  # noqa: E402
 import collect  # noqa: E402
 import news  # noqa: E402
-from fakes import fake_bis, fake_caps, fake_fred, fake_lme, fake_news, fake_prices, fake_yahoo  # noqa: E402
+from fakes import fake_bis, fake_ecos, fake_caps, fake_fred, fake_lme, fake_news, fake_prices, fake_yahoo  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -29,7 +29,7 @@ def site_url(tmp_path_factory):
         shutil.copytree(real, www / "data", dirs_exist_ok=True)
     else:
         reg = collect.load_registry()
-        latest, series = collect.collect(reg, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme, fetch_bis=fake_bis, log=lambda *_: None)
+        latest, series = collect.collect(reg, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme, fetch_bis=fake_bis, fetch_ecos=fake_ecos, log=lambda *_: None)
         collect.write_output(www / "data", reg, latest, series)
         news.build_notes(reg, www / "data", search=fake_news, load_previous=lambda *a: {}, sleep=0,
                          log=lambda *_: None)

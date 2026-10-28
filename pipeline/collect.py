@@ -27,6 +27,8 @@ from pathlib import Path
 import pandas as pd
 import requests
 
+import releases
+
 HERE = Path(__file__).resolve().parent
 REGISTRY_PATH = HERE / "indicators.json"
 
@@ -92,10 +94,16 @@ def fetch_yahoo(codes):
 def fetch_lme(code, session=None):
     """LME 현금 결제가(일별, $/t)를 westmetall.com 표에서 읽습니다. code 예: LME_Cu_cash"""
     session = session or _session()
-    r = session.get("https://www.westmetall.com/en/markdaten.php", timeout=HTTP_TIMEOUT,
-                    params={"action": "table", "field": code})
-    r.raise_for_status()
-    return parse_lme_html(r.text)
+    err = None
+    # www 주소는 GitHub 실행기에서 접속이 막힐 때가 있어 다른 주소로도 시도
+    for base in ("https://westmetall.com", "https://www.westmetall.com", "http://www.westmetall.com"):
+        try:
+            r = session.get(f"{base}/en/markdaten.php", timeout=HTTP_TIMEOUT, params={"action": "table", "field": code})
+            r.raise_for_status()
+            return parse_lme_html(r.text)
+        except Exception as e:  # noqa: BLE001
+            err = e
+    raise err
 
 
 def parse_lme_html(html):
@@ -125,6 +133,50 @@ def fetch_bis(code, session=None):
                     params={"format": "csv", "startPeriod": FETCH_START})
     r.raise_for_status()
     return parse_bis_csv(r.text)
+
+
+ECOS_ROWS = 10  # 공개 시험용 키(sample)는 한 번에 10개까지만 줍니다
+
+
+def ecos_periods(cycle, n, today=None):
+    """오늘까지 최근 n개 기간 코드 (Q: 2026Q3, M: 202609)."""
+    p = pd.Period(today or pd.Timestamp.now(), freq="Q" if cycle == "Q" else "M")
+    out = [p - k for k in range(n)][::-1]
+    return [f"{x.year}Q{x.quarter}" if cycle == "Q" else f"{x.year}{x.month:02d}" for x in out]
+
+
+def fetch_ecos(code, key=None, session=None, periods=20, today=None):
+    """한국은행 ECOS 통계 최근 값. code 예: 200Y102/Q/10111 (통계표/주기/항목).
+
+    ECOS_API_KEY가 없으면 공개 시험용 키로 10개씩 나눠 받습니다.
+    """
+    session = session or _session()
+    key = key or os.environ.get("ECOS_API_KEY", "").strip() or "sample"
+    stat, cycle, item = code.split("/")
+    want = ecos_periods(cycle, periods, today)
+    chunks = [want[i:i + ECOS_ROWS] for i in range(0, len(want), ECOS_ROWS)] if key == "sample" else [want]
+    rows = []
+    for c in chunks:
+        r = session.get(f"https://ecos.bok.or.kr/api/StatisticSearch/{key}/json/kr/1/{max(len(c), ECOS_ROWS)}"
+                        f"/{stat}/{cycle}/{c[0]}/{c[-1]}/{item}", timeout=HTTP_TIMEOUT)
+        r.raise_for_status()
+        d = r.json()
+        if "StatisticSearch" not in d:
+            if c is chunks[-1] and not rows:
+                raise ValueError(f"ECOS 응답 오류: {str(d)[:150]}")
+            continue
+        rows += d["StatisticSearch"]["row"]
+    return parse_ecos_rows(rows)
+
+
+def parse_ecos_rows(rows):
+    def when(t):
+        return pd.Period(t.replace("Q", "-Q"), freq="Q").start_time if "Q" in t else pd.Timestamp(f"{t[:4]}-{t[4:6]}-01")
+    s = pd.Series({when(r["TIME"]): r["DATA_VALUE"] for r in rows})
+    s = pd.to_numeric(s, errors="coerce").dropna().sort_index()
+    if not len(s):
+        raise ValueError("ECOS 데이터가 비어 있습니다")
+    return s.astype(float)
 
 
 def parse_bis_csv(text):
@@ -260,7 +312,7 @@ def build_curve(curve_def, fred_raw):
 
 def collect(registry, fred_key=None, previous_url=None,
             fetch_fred=fetch_fred, fetch_yahoo=fetch_yahoo, fetch_previous=fetch_previous,
-            fetch_lme=fetch_lme, fetch_bis=fetch_bis, log=print):
+            fetch_lme=fetch_lme, fetch_bis=fetch_bis, fetch_ecos=fetch_ecos, log=print):
     inds = registry["indicators"]
     errors = {}
 
@@ -311,6 +363,20 @@ def collect(registry, fred_key=None, previous_url=None,
     if bis_codes:
         log(f"BIS: {len(bis_raw)}/{len(bis_codes)}개 수집")
 
+    # 최근 값 보강 (예: 한국 지표는 ECOS가 FRED·BIS보다 몇 달 빠름)
+    recent = {}
+    for ind in inds:
+        rc = ind.get("recent")
+        if not rc:
+            continue
+        try:
+            r = fetch_ecos(rc["code"], periods=rc.get("periods", 20))
+            recent[ind["id"]] = transform(r, {**ind, "transform": rc.get("transform")})
+        except Exception as e:  # noqa: BLE001
+            errors[rc["code"]] = str(e)[:200]
+    if recent:
+        log(f"ECOS 최근 값: {len(recent)}/{sum(1 for i in inds if i.get('recent'))}개")
+
     raw = {**fred_raw, **yahoo_raw, **lme_raw, **bis_raw}
     series, items = {}, []
     for ind in inds:
@@ -323,6 +389,10 @@ def collect(registry, fred_key=None, previous_url=None,
         if s is None or len(s) < 2:
             s = fetch_previous(previous_url, ind["id"])
             status = "stale" if s is not None and len(s) >= 2 else "missing"
+        if ind["id"] in recent:
+            r = recent[ind["id"]]
+            s = r if s is None else pd.concat([s[~s.index.isin(r.index)], r]).sort_index()
+            status = "ok" if len(s) >= 2 else status
         item = {"id": ind["id"], "status": status}
         if status != "missing":
             series[ind["id"]] = s
@@ -367,6 +437,15 @@ def main(argv=None):
     latest, series = collect(registry,
                              fred_key=os.environ.get("FRED_API_KEY", "").strip() or None,
                              previous_url=os.environ.get("PREVIOUS_DATA_URL", "").strip() or None)
+    prev_url = os.environ.get("PREVIOUS_DATA_URL", "").strip()
+    prev_latest = None
+    if prev_url:
+        try:
+            r = _session().get(f"{prev_url.rstrip('/')}/latest.json", timeout=HTTP_TIMEOUT)
+            prev_latest = r.json() if r.status_code == 200 else None
+        except Exception:  # noqa: BLE001
+            pass
+    releases.annotate(registry, latest, prev_latest, session=_session())
     c = latest["counts"]
     total = len(registry["indicators"])
     print(f"정상 {c['ok']} · 이전 값 유지 {c['stale']} · 없음 {c['missing']} (전체 {total})")

@@ -128,6 +128,42 @@ function subText(def, item) {
   return subs.join(' · ');
 }
 
+// 발표 일정: item.release = { last, next, est } (월간·분기 지표)
+const WEEKDAY = '일월화수목금토';
+const fmtMD = s => { const d = parseDate(s); return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY[d.getDay()]})`; };
+function daysUntil(s) {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  return Math.round((parseDate(s) - t) / 864e5);
+}
+
+// 추정 날짜는 정확한 날 대신 "11월 중순"처럼 대략 표시
+function fmtNext(r) {
+  if (!r.est) return fmtMD(r.next);
+  const d = parseDate(r.next);
+  return `${d.getMonth() + 1}월 ${d.getDate() <= 10 ? '초' : d.getDate() <= 20 ? '중순' : '하순'}`;
+}
+
+function releaseNode(item) {
+  const r = item.release;
+  if (!r?.next) return null;
+  const n = daysUntil(r.next);
+  if (n < 0) return null;
+  const line = el('span', 'mc-rel');
+  line.append(`다음 발표 ${fmtNext(r)}`);
+  if (!r.est && n <= 3) line.appendChild(el('span', `dday${n === 0 ? ' today' : ''}`, n === 0 ? '오늘 발표' : `D-${n}`));
+  line.title = `${r.last ? `이번 발표 ${fmtMD(r.last)} · ` : ''}다음 발표 ${fmtNext(r)}${r.est ? ' (평소 일정으로 추정)' : ''}`;
+  return line;
+}
+
+function releaseText(item) {
+  const r = item.release;
+  if (!r) return '';
+  const parts = [];
+  if (r.last) parts.push(`이번 발표 ${fmtMD(r.last)}`);
+  if (r.next && daysUntil(r.next) >= 0) parts.push(`다음 발표 ${fmtNext(r)}${r.est ? '(추정)' : ''}`);
+  return parts.join(' · ');
+}
+
 function ariaFor(def, item, period = 'prev') {
   const c = item.changes[period];
   const label = period === 'prev' ? `${FREQ_PREV[def.freq]} 대비` : `${PERIOD_LABEL[period]} 대비`;
@@ -218,14 +254,16 @@ function macroCard(def, item) {
   const mid = el('span', 'mc-mid');
   mid.append(valueNode(def, item.last.value, 'mc-val'), changeNode(def, item));
   const prev = item.changes.prev;
-  const sub = [`${fmtDate(def, item.last.date)}${def.freq === 'daily' ? ' 기준' : ''}`];
+  const sub = [`${fmtDate(def, item.last.date)}${def.freq === 'daily' ? ' 기준' : ''}${item.prelim ? ' ' + item.prelim : ''}`];
   if (prev?.ref != null) sub.push(`이전 ${withUnit(def, prev.ref)}`);
   if (item.forecast?.points?.length) sub.push(subText(def, item).split(' · ').pop());
   const sp = (item.spark || []).slice(def.freq === 'quarterly' ? -12 : def.freq === 'monthly' ? -24 : -60);
   const chart = def.freq === 'daily' || def.freq === 'weekly'
     ? sparkline(sp, { width: 240, height: 48, color: `var(--${trendCls(item)})`, area: true })
-    : bars(sp, { width: 240, height: 48, color: `var(--${trendCls({ spark: sp.slice(-2) })})` });
+    : bars(sp, { width: 240, height: 48, color: `var(--${trendCls({ spark: sp.slice(-2) })})`, hatched: item.prelim ? [sp.length - 1] : [] });
   b.append(top, mid, chart, el('span', 'mc-sub', sub.join(' · ')));
+  const rel = releaseNode(item);
+  if (rel) b.appendChild(rel);
   b.addEventListener('click', () => openDetail(def.id));
   return b;
 }
@@ -309,6 +347,7 @@ document.getElementById('period').addEventListener('click', e => {
 
 // ── 시장 지도 (트리맵) ──────────────────────────────────
 const MAP_SCALE = { prev: 3, w1: 6, m1: 10, ytd: 30, y1: 40 };
+const MAP_INDEX = { spx: ['spx', 'S&P 500 지수'], nasdaq: ['nasdaq', '나스닥 종합지수'], kospi: ['kospi', '코스피 지수'], kosdaq: ['kosdaq', '코스닥 지수'] };
 const MAP_PERIOD_LABEL = { prev: '하루', w1: '1주', m1: '1개월', ytd: '연초 대비', y1: '1년' };
 
 function heatColor(v, period) {
@@ -352,8 +391,21 @@ function mapSide(market, period) {
   // 지수 기여도 ≈ 비중 × 등락률
   const contrib = items.map(i => ({ ...i, c: (i.w * i.chg[period]) / 100 })).sort((a, b) => b.c - a.c);
   const total = contrib.reduce((a, b) => a + b.c, 0);
+  // 지수 실제 등락이 있으면 그것을 크게, 지도 종목 합산은 설명과 함께 작게
+  const [idxId, idxName] = MAP_INDEX[market.id] || [];
+  const idx = state.items.get(idxId)?.changes?.[period];
+  const cls = v => (v > 0 ? 'up' : v < 0 ? 'down' : '');
   const sum = el('div', 'ms-sum');
-  sum.append(el('span', 'muted', `상위 ${items.length}종목 가중 등락 (${MAP_PERIOD_LABEL[period]})`), el('strong', total > 0 ? 'up' : total < 0 ? 'down' : '', fmtPct(total)));
+  const covered = `시가총액 상위 ${items.length}개 종목`;
+  if (idx) {
+    sum.append(el('span', 'muted', `${idxName} ${MAP_PERIOD_LABEL[period]} 등락`), el('strong', cls(idx.value), fmtPct(idx.value)));
+    const note = el('span', 'ms-note');
+    note.append(`지도에 담은 ${covered}만 합치면 `, el('b', cls(total), fmtPct(total)), '입니다. 나머지 종목이 빠져 있어 지수와 조금 다를 수 있습니다.');
+    sum.appendChild(note);
+  } else {
+    sum.append(el('span', 'muted', `${covered} 합산 등락 (${MAP_PERIOD_LABEL[period]})`), el('strong', cls(total), fmtPct(total)),
+      el('span', 'ms-note', '지도에 담은 종목의 등락률을 시가총액 비중대로 더한 값으로, 지수 등락의 근사치입니다.'));
+  }
   side.appendChild(sum);
 
   const list = (title, rows) => {
@@ -664,8 +716,12 @@ async function openDetail(id, { focus } = {}) {
   const dir = direction(c);
   const val = document.getElementById('detail-value');
   val.replaceChildren(valueNode(def, item.last.value, 'dv-val'), pill(def, c));
-  document.getElementById('detail-sub').textContent =
-    `${FREQ_PREV[def.freq]} 대비 ${c ? dir.word : '–'} · ${fmtDate(def, item.last.date)} 기준${item.forecast?.points?.length ? ' · ' + subText(def, item).split(' · ').pop() : ''}`;
+  document.getElementById('detail-sub').textContent = [
+    `${FREQ_PREV[def.freq]} 대비 ${c ? dir.word : '–'}`,
+    `${fmtDate(def, item.last.date)} ${item.prelim ? item.prelim + '(이후 수정될 수 있음)' : '기준'}`,
+    item.forecast?.points?.length ? subText(def, item).split(' · ').pop() : '',
+    releaseText(item),
+  ].filter(Boolean).join(' · ');
   if (!dlg.open) dlg.showModal();
   if (def.freq !== 'daily' && def.freq !== 'weekly' && state.range === '3m') setRange('1y');
   const chartBox = document.getElementById('detail-chart');

@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import briefing  # noqa: E402
 import collect  # noqa: E402
 import news  # noqa: E402
-from fakes import fake_bis, fake_fred, fake_lme, fake_news, fake_yahoo  # noqa: E402
+from fakes import fake_bis, fake_ecos, fake_fred, fake_lme, fake_news, fake_yahoo  # noqa: E402
 
 REG = collect.load_registry()
 DEFS = {i["id"]: i for i in REG["indicators"]}
@@ -18,7 +18,7 @@ TODAY = date(2026, 10, 24)
 
 def latest():
     out, _ = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme,
-                             fetch_bis=fake_bis, log=lambda *_: None)
+                             fetch_bis=fake_bis, fetch_ecos=fake_ecos, log=lambda *_: None)
     return out
 
 
@@ -113,7 +113,7 @@ def test_outdated_data_is_left_out():
 
 def test_write_outputs(tmp_path):
     data, series = collect.collect(REG, fetch_fred=fake_fred, fetch_yahoo=fake_yahoo, fetch_lme=fake_lme,
-                                   fetch_bis=fake_bis, log=lambda *_: None)
+                                   fetch_bis=fake_bis, fetch_ecos=fake_ecos, log=lambda *_: None)
     collect.write_output(tmp_path, REG, data, series)
     news.build_notes(REG, tmp_path, search=fake_news, load_previous=lambda *a: {}, sleep=0, log=lambda *_: None)
     md = briefing.write(tmp_path, TODAY)
